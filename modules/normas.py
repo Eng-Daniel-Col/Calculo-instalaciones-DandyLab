@@ -70,6 +70,6 @@ class NormativaElectrica:
             "mensaje": f"Cumple con {self.config['codigo']}" if cumple else f"Excede el máximo permitido ({limite}%) según {self.config['codigo']}"
         }
 
-    def obtener_factor_diseno(() -> float:
+    def obtener_factor_diseno(self) -> float:
         """Devuelve el factor de sobrecorriente para cargas continuas (125%)."""
         return self.config["factor_carga_continua"]
