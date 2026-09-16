@@ -1,30 +1,25 @@
-# app.py
 import os
+import glob
 import streamlit as st
-from modules.cuadro_cargas import generar_cuadro_de_cargas
-from modules.informes import generar_pdf_informe
 
-st.set_page_config(
-    page_title="DandyLab Soluciones - Dimensionamiento Eléctrico",
-    page_icon="⚡",
-    layout="wide"
-)
+# ... tu set_page_config ...
 
-# CARGAR LOGO EN LA INTERFAZ WEB
-ruta_logo = os.path.join("assets", "logo", "logo.png")
+# Búsqueda automática de cualquier imagen dentro de assets/logo/
+carpeta_logo = os.path.abspath(os.path.join("assets", "logo"))
+patron_imagenes = os.path.join(carpeta_logo, "*.[pP][nN][gG]")  # Busca .png o .PNG
+archivos_encontrados = glob.glob(os.path.join(carpeta_logo, "*.*")) # Busca cualquier extensión
 
 col_logo, col_titulo = st.columns([1, 4])
 with col_logo:
-    if os.path.exists(ruta_logo):
-        st.image(ruta_logo, width=150)
+    if archivos_encontrados:
+        st.image(archivos_encontrados[0], width=150)
     else:
-        st.warning("⚠️ Logo no encontrado")
+        st.warning("⚠️ Sin logo en assets/logo/")
 
 with col_titulo:
     st.title("⚡ DandyLab Soluciones")
     st.caption("Dimensionamiento Eléctrico Industrial & Especializado bajo RETIE / NTC 2050")
 
-st.divider()
 
 # app.py
 import streamlit as st
