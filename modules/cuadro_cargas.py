@@ -1,9 +1,34 @@
 # modules/cuadro_cargas.py
+import math
 from typing import List, Dict, Any
 from .normas import NormativaElectrica
-from .calculo_electrico import calcular_corrientes  # Asumiendo función base
 from .conductores import seleccionar_conductor
 from .protecciones import calcular_breaker_circuito, calcular_breaker_principal_tablero
+
+def _calcular_corrientes_internas(
+    potencia_w: float,
+    voltaje: float,
+    fases: int,
+    factor_potencia: float = 0.85,
+    eficiencia: float = 1.0
+) -> Dict[str, float]:
+    """Cálculo interno de corrientes nominal y de diseño (125%)."""
+    if eficiencia <= 0:
+        eficiencia = 1.0
+    
+    potencia_entrada = potencia_w / eficiencia
+    
+    if fases == 3:
+        i_nom = potencia_entrada / (math.sqrt(3) * voltaje * factor_potencia)
+    else:
+        i_nom = potencia_entrada / (voltaje * factor_potencia)
+        
+    i_diseno = i_nom * 1.25  # Factor de carga continua RETIE / NTC 2050
+    
+    return {
+        "corriente_nominal": round(i_nom, 2),
+        "corriente_diseno": round(i_diseno, 2)
+    }
 
 def generar_cuadro_de_cargas(
     datos_tablero: Dict[str, Any],
@@ -12,7 +37,6 @@ def generar_cuadro_de_cargas(
 ) -> Dict[str, Any]:
     norma = NormativaElectrica(pais_norma)
     circuitos_procesados = []
-    
     potencia_total_w = 0.0
     
     # 1. Procesar cada circuito derivado
@@ -20,8 +44,7 @@ def generar_cuadro_de_cargas(
         potencia_w = eq["potencia_w"]
         potencia_total_w += potencia_w
         
-        # Corrientes
-        c_calc = calcular_corrientes(
+        c_calc = _calcular_corrientes_internas(
             potencia_w=potencia_w,
             voltaje=eq["voltaje"],
             fases=eq["fases"],
@@ -29,7 +52,6 @@ def generar_cuadro_de_cargas(
             eficiencia=eq.get("eficiencia", 1.0)
         )
         
-        # Conductor
         cond = seleccionar_conductor(
             corriente_diseno=c_calc["corriente_diseno"],
             corriente_nominal=c_calc["corriente_nominal"],
@@ -39,7 +61,6 @@ def generar_cuadro_de_cargas(
             factor_potencia=eq.get("fp", 0.85)
         )
         
-        # Proteccion
         prot = calcular_breaker_circuito(
             corriente_diseno=c_calc["corriente_diseno"],
             ampacidad_conductor=cond["ampacidad_soporte_a"],
@@ -63,7 +84,7 @@ def generar_cuadro_de_cargas(
     f_tablero = datos_tablero["fases"]
     dist_acometida = datos_tablero["distancia_acometida_m"]
     
-    c_tablero = calcular_corrientes(
+    c_tablero = _calcular_corrientes_internas(
         potencia_w=potencia_total_w,
         voltaje=v_tablero,
         fases=f_tablero,
