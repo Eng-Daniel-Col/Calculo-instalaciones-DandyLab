@@ -1,3 +1,114 @@
+# modules/informes.py
+import os
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+
+def generar_pdf_informe(
+    nombre_archivo: str,
+    datos_cliente: dict,
+    resultado_calculo: dict
+) -> str:
+    doc = SimpleDocTemplate(
+        nombre_archivo,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+    
+    styles = getSampleStyleSheet()
+    
+    titulo_style = ParagraphStyle(
+        'TituloDandy',
+        parent=styles['Heading1'],
+        fontSize=16,
+        leading=20,
+        textColor=colors.HexColor("#0f172a"),
+        bold=True
+    )
+    
+    story = []
+
+    # RUTA RÍGIDA DEL LOGO
+    ruta_logo = os.path.abspath(os.path.join("assets", "logo", "logo.png"))
+    
+    if os.path.exists(ruta_logo):
+        img_logo = Image(ruta_logo, width=110, height=45)
+        encabezado_data = [
+            [img_logo, Paragraph("<b>DANDYLAB SOLUCIONES</b><br/><font size=8 color='#475569'>Servicios de Ingeniería | Instalaciones Industriales & Láser</font>", titulo_style)]
+        ]
+        t_header = Table(encabezado_data, colWidths=[120, 420])
+        t_header.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(t_header)
+    else:
+        story.append(Paragraph("<b>DANDYLAB SOLUCIONES</b>", titulo_style))
+
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#2563eb"), spaceAfter=15))
+
+  
+import os
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+
+def generar_pdf_informe(
+    nombre_archivo: str,
+    datos_cliente: dict,
+    resultado_calculo: dict
+) -> str:
+    doc = SimpleDocTemplate(
+        nombre_archivo,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+    
+    styles = getSampleStyleSheet()
+    
+    titulo_style = ParagraphStyle(
+        'TituloDandy',
+        parent=styles['Heading1'],
+        fontSize=16,
+        leading=20,
+        textColor=colors.HexColor("#0f172a"),
+        bold=True
+    )
+    
+    story = []
+
+    # RUTA RÍGIDA DEL LOGO
+    ruta_logo = os.path.abspath(os.path.join("assets", "logo", "logo.png"))
+    
+    if os.path.exists(ruta_logo):
+        img_logo = Image(ruta_logo, width=110, height=45)
+        encabezado_data = [
+            [img_logo, Paragraph("<b>DANDYLAB SOLUCIONES</b><br/><font size=8 color='#475569'>Servicios de Ingeniería | Instalaciones Industriales & Láser</font>", titulo_style)]
+        ]
+        t_header = Table(encabezado_data, colWidths=[120, 420])
+        t_header.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(t_header)
+    else:
+        story.append(Paragraph("<b>DANDYLAB SOLUCIONES</b>", titulo_style))
+
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#2563eb"), spaceAfter=15))
+
+
 import os
 from reportlab.platypus import Image
 
