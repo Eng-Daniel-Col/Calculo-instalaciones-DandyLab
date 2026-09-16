@@ -1,3 +1,37 @@
+import os
+from reportlab.platypus import Image
+
+# ... resto de importaciones ...
+
+def generar_pdf_informe(nombre_archivo: str, datos_cliente: dict, resultado_calculo: dict) -> str:
+    # ... configuración de doc y styles ...
+    story = []
+
+    # Ruta del logo
+    ruta_logo = os.path.join("assets", "logo", "logo.png")
+    
+    # Encabezado con Logo y Texto
+    if os.path.exists(ruta_logo):
+        img_logo = Image(ruta_logo, width=120, height=50) # Ajusta ancho y alto según tu imagen
+        encabezado_data = [
+            [img_logo, Paragraph("<b>DANDYLAB SOLUCIONES</b><br/><font size=8 color='#475569'>Servicios de Ingeniería | Instalaciones Industriales & Láser</font>", titulo_style)]
+        ]
+        t_header = Table(encabezado_data, colWidths=[130, 410])
+        t_header.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(t_header)
+    else:
+        story.append(Paragraph("<b>DANDYLAB SOLUCIONES</b>", titulo_style))
+        story.append(Paragraph("Servicios de Ingeniería | Instalaciones Industriales & Láser", subtitulo_style))
+
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#2563eb"), spaceAfter=15))
+    
+    # ... resto del código del PDF ...
+
 # modules/informes.py
 import os
 from reportlab.lib.pagesizes import letter
@@ -142,7 +176,7 @@ def generar_pdf_informe(
 
     # 5. FIRMA Y RESPONSABLE TÉCNICO
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#94a3b8"), spaceAfter=15))
-    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Automatización e Instalaciones Industriales", texto_normal))
+    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Ingeniero Mecatrónico | Especialista en Automatización , Robotica y Fibra Láser", texto_normal))
     story.append(Paragraph("Dandylab Soluciones | Medellín, Colombia", subtitulo_style))
 
     doc.build(story)
