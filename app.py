@@ -1,27 +1,7 @@
+# app.py
 import os
 import glob
-import streamlit as st
-
-# ... tu set_page_config ...
-
-# Búsqueda automática de cualquier imagen dentro de assets/logo/
-carpeta_logo = os.path.abspath(os.path.join("assets", "logo"))
-patron_imagenes = os.path.join(carpeta_logo, "*.[pP][nN][gG]")  # Busca .png o .PNG
-archivos_encontrados = glob.glob(os.path.join(carpeta_logo, "*.*")) # Busca cualquier extensión
-
-col_logo, col_titulo = st.columns([1, 4])
-with col_logo:
-    if archivos_encontrados:
-        st.image(archivos_encontrados[0], width=150)
-    else:
-        st.warning("⚠️ Sin logo en assets/logo/")
-
-with col_titulo:
-    st.title("⚡ DandyLab Soluciones")
-    st.caption("Dimensionamiento Eléctrico Industrial & Especializado bajo RETIE / NTC 2050")
-
-
-# app.py
+from datetime import datetime
 import streamlit as st
 from modules.cuadro_cargas import generar_cuadro_de_cargas
 from modules.informes import generar_pdf_informe
@@ -32,91 +12,139 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("⚡ DandyLab Soluciones - Dimensionamiento Eléctrico Industrial")
-st.caption("Cálculo de conductores, protecciones y cuadro de cargas bajo normativa RETIE / NTC 2050.")
+# Encabezado con búsqueda automática de Logo
+carpeta_logo = os.path.abspath(os.path.join("assets", "logo"))
+archivos_encontrados = glob.glob(os.path.join(carpeta_logo, "*.*"))
 
-# Inicializar lista de equipos en estado de sesión
+col_logo, col_titulo = st.columns([1, 4])
+with col_logo:
+    if archivos_encontrados:
+        st.image(archivos_encontrados[0], width=140)
+    else:
+        st.warning("⚠️ Sin logo en assets/logo/")
+
+with col_titulo:
+    st.title("⚡ DandyLab Soluciones")
+    st.caption("Dimensionamiento Eléctrico Industrial & Especializado bajo RETIE / NTC 2050")
+
+# Inicialización de estado de sesión
 if "equipos" not in st.session_state:
     st.session_state.equipos = [
         {"nombre": "Fuente Láser", "potencia_w": 6000.0, "voltaje": 220.0, "fases": 3, "fp": 0.90, "distancia_m": 10.0},
         {"nombre": "Chiller de Enfriamiento", "potencia_w": 3000.0, "voltaje": 220.0, "fases": 1, "fp": 0.85, "distancia_m": 25.0}
     ]
 
-# ---------------------------------------------------------
-# DATOS DEL CLIENTE Y TABLERO PRINCIPAL
-# ---------------------------------------------------------
-st.header("1. Datos del Cliente y Tablero Principal")
-
-col_c1, col_c2 = st.columns(2)
-with col_c1:
-    nombre_cliente = st.text_input("Nombre del Cliente / Empresa", value="Cliente Industrial S.A.S.")
-with col_c2:
-    ubicacion_cliente = st.text_input("Ubicación de la Instalación", value="Medellín, Antioquia")
-
-col_tab1, col_tab2, col_tab3, col_tab4 = st.columns(4)
-
-with col_tab1:
-    v_tablero = st.selectbox("Voltaje Red (V)", [220, 380, 440, 110], index=0)
-with col_tab2:
-    f_tablero = st.selectbox("Sistema Fases", [3, 1], index=0, format_func=lambda x: "Trifásico (3P)" if x == 3 else "Monofásico / Bifásico (1P/2P)")
-with col_tab3:
-    dist_acometida = st.number_input("Distancia a Acometida (m)", min_value=1.0, value=15.0, step=1.0)
-with col_tab4:
-    norma_seleccionada = st.selectbox("Norma Aplicable", ["COLOMBIA", "MEXICO", "EEUU"], index=0)
+# ESTABLECER PESTAÑAS
+tab_calc, tab_cliente, tab_fotos = st.tabs([
+    "📊 Calculadora Eléctrica", 
+    "📋 Datos del Cliente", 
+    "📷 Fotos y Parámetros"
+])
 
 # ---------------------------------------------------------
-# GESTIÓN DE CIRCUITOS DERIVADOS (EQUIPOS)
+# PESTAÑA 1: CALCULADORA ELÉCTRICA
 # ---------------------------------------------------------
-st.header("2. Circuitos Derivados (Equipos a Conectar)")
+with tab_calc:
+    st.header("1. Configuración del Tablero Principal")
+    col_tab1, col_tab2, col_tab3, col_tab4 = st.columns(4)
 
-st.subheader("Añadir Nuevo Equipo")
-col_eq1, col_eq2, col_eq3, col_eq4, col_eq5, col_eq6 = st.columns([2, 1.5, 1.2, 1.2, 1.2, 1])
+    with col_tab1:
+        v_tablero = st.selectbox("Voltaje Red (V)", [220, 380, 440, 110], index=0)
+    with col_tab2:
+        f_tablero = st.selectbox("Sistema Fases", [3, 1], index=0, format_func=lambda x: "Trifásico (3P)" if x == 3 else "Monofásico / Bifásico (1P/2P)")
+    with col_tab3:
+        dist_acometida = st.number_input("Distancia a Acometida (m)", min_value=1.0, value=15.0, step=1.0)
+    with col_tab4:
+        norma_seleccionada = st.selectbox("Norma Aplicable", ["COLOMBIA", "MEXICO", "EEUU"], index=0)
 
-with col_eq1:
-    nuevo_nombre = st.text_input("Nombre del Equipo", value="Extractor de Humos")
-with col_eq2:
-    nueva_potencia = st.number_input("Potencia (Watts)", min_value=100.0, value=1500.0, step=100.0)
-with col_eq3:
-    nuevo_voltaje = st.selectbox("Voltaje (V)", [220, 380, 440, 110], index=0, key="nuevo_v")
-with col_eq4:
-    nuevas_fases = st.selectbox("Fases", [3, 1], index=0, key="nuevo_f")
-with col_eq5:
-    nueva_distancia = st.number_input("Distancia (m)", min_value=1.0, value=15.0, step=1.0, key="nuevo_d")
-with col_eq6:
-    st.write("##")
-    if st.button("➕ Agregar"):
-        st.session_state.equipos.append({
-            "nombre": nuevo_nombre,
-            "potencia_w": nueva_potencia,
-            "voltaje": nuevo_voltaje,
-            "fases": nuevas_fases,
-            "fp": 0.85,
-            "distancia_m": nueva_distancia
-        })
-        st.success(f"Equipo '{nuevo_nombre}' añadido.")
+    st.header("2. Circuitos Derivados (Equipos a Conectar)")
+    st.subheader("Añadir Nuevo Equipo")
+    col_eq1, col_eq2, col_eq3, col_eq4, col_eq5, col_eq6 = st.columns([2, 1.5, 1.2, 1.2, 1.2, 1])
 
-# Tabla de equipos cargados
-if st.session_state.equipos:
-    st.subheader("Lista de Equipos Registrados")
-    for idx, eq in enumerate(st.session_state.equipos):
-        c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 2, 2, 2, 1])
-        c1.write(f"**{eq['nombre']}**")
-        c2.write(f"⚡ {eq['potencia_w']} W")
-        c3.write(f"🔌 {eq['voltaje']} V")
-        c4.write(f"🌀 {'Trifásico' if eq['fases'] == 3 else 'Monofásico'}")
-        c5.write(f"📏 {eq['distancia_m']} m")
-        if c6.button("🗑️", key=f"del_{idx}"):
-            st.session_state.equipos.pop(idx)
-            st.rerun()
+    with col_eq1:
+        nuevo_nombre = st.text_input("Nombre del Equipo", value="Extractor de Humos")
+    with col_eq2:
+        nueva_potencia = st.number_input("Potencia (Watts)", min_value=100.0, value=1500.0, step=100.0)
+    with col_eq3:
+        nuevo_voltaje = st.selectbox("Voltaje (V)", [220, 380, 440, 110], index=0, key="nuevo_v")
+    with col_eq4:
+        nuevas_fases = st.selectbox("Fases", [3, 1], index=0, key="nuevo_f")
+    with col_eq5:
+        nueva_distancia = st.number_input("Distancia (m)", min_value=1.0, value=15.0, step=1.0, key="nuevo_d")
+    with col_eq6:
+        st.write("##")
+        if st.button("➕ Agregar"):
+            st.session_state.equipos.append({
+                "nombre": nuevo_nombre,
+                "potencia_w": nueva_potencia,
+                "voltaje": nuevo_voltaje,
+                "fases": nuevas_fases,
+                "fp": 0.85,
+                "distancia_m": nueva_distancia
+            })
+            st.success(f"Equipo '{nuevo_nombre}' añadido.")
 
+    if st.session_state.equipos:
+        st.subheader("Lista de Equipos Registrados")
+        for idx, eq in enumerate(st.session_state.equipos):
+            c1, c2, c3, c4, c5, c6 = st.columns([3, 2, 2, 2, 2, 1])
+            c1.write(f"**{eq['nombre']}**")
+            c2.write(f"⚡ {eq['potencia_w']} W")
+            c3.write(f"🔌 {eq['voltaje']} V")
+            c4.write(f"🌀 {'Trifásico' if eq['fases'] == 3 else 'Monofásico'}")
+            c5.write(f"📏 {eq['distancia_m']} m")
+            if c6.button("🗑️", key=f"del_{idx}"):
+                st.session_state.equipos.pop(idx)
+                st.rerun()
+
+# ---------------------------------------------------------
+# PESTAÑA 2: DATOS DEL CLIENTE E INSTALACIÓN
+# ---------------------------------------------------------
+with tab_cliente:
+    st.header("Información del cliente e instalación")
+    
+    cliente_nombre = st.text_input("Nombre / Empresa del Cliente", value="Empresa Ejemplo S.A.S.")
+    cliente_direccion = st.text_input("Dirección de la Instalación", value="Calle Principal # 45 - 67")
+    cliente_telefono = st.text_input("Teléfono de Contacto", value="+57 300 000 0000")
+    cliente_modelo = st.text_input("Modelo / ID de la Máquina", value="MAQ-2026-X")
+    cliente_fecha = st.date_input("Fecha de Instalación", value=datetime.now())
+
+# ---------------------------------------------------------
+# PESTAÑA 3: FOTOS Y PARÁMETROS (NAMEPLATES)
+# ---------------------------------------------------------
+with tab_fotos:
+    st.header("Fotos y Registro de Nameplates (Placas de Características)")
+    st.caption("Carga las fotografías de las placas técnicas de los componentes de la máquina.")
+    
+    archivos_subidos = st.file_uploader(
+        "Subir imágenes de Nameplates (JPG, PNG)", 
+        type=["jpg", "jpeg", "png"], 
+        accept_multiple_files=True
+    )
+    
+    rutas_fotos_guardadas = []
+    if archivos_subidos:
+        st.subheader("Vista Previa de Placas Cargadas:")
+        cols_foto = st.columns(3)
+        os.makedirs("temp_uploads", exist_ok=True)
+        
+        for idx, file in enumerate(archivos_subidos):
+            temp_path = os.path.join("temp_uploads", f"nameplate_{idx}_{file.name}")
+            with open(temp_path, "wb") as f:
+                f.write(file.getbuffer())
+            rutas_fotos_guardadas.append(temp_path)
+            
+            with cols_foto[idx % 3]:
+                st.image(file, caption=f"Nameplate: {file.name}", use_column_width=True)
+
+# ---------------------------------------------------------
+# CÁLCULO GENERAL Y GENERACIÓN DE INFORME
+# ---------------------------------------------------------
 st.divider()
 
-# ---------------------------------------------------------
-# PROCESAMIENTO Y CUADRO DE CARGAS
-# ---------------------------------------------------------
-if st.button("🚀 Calcular Dimensionamiento y Cuadro de Cargas", type="primary", use_container_width=True):
+if st.button("🚀 Calcular Dimensionamiento y Generar Informe PDF", type="primary", use_container_width=True):
     if not st.session_state.equipos:
-        st.error("Debes agregar al menos un equipo antes de realizar el cálculo.")
+        st.error("Debes agregar al menos un equipo en la pestaña 'Calculadora Eléctrica'.")
     else:
         datos_tablero = {
             "voltaje": v_tablero,
@@ -132,11 +160,10 @@ if st.button("🚀 Calcular Dimensionamiento y Cuadro de Cargas", type="primary"
 
         st.subheader(f"📊 Resultados del Cuadro de Cargas ({resultado['norma_aplicada']})")
 
-        # Visualización de Circuitos Derivados
+        # Visualización en pantalla
         st.markdown("### Circuitos Derivados")
         st.dataframe(resultado["cuadro_cargas_circuitos"], use_container_width=True)
 
-        # Visualización Alimentador y Tablero Principal
         st.markdown("### Tablero Principal / Alimentador")
         tab_info = resultado["tablero_principal"]
         bp_info = tab_info["breaker_principal"]
@@ -157,17 +184,27 @@ if st.button("🚀 Calcular Dimensionamiento y Cuadro de Cargas", type="primary"
         # GENERACIÓN Y DESCARGA DEL PDF
         st.divider()
         pdf_path = "informe_dimensionamiento.pdf"
+        
+        datos_cliente_dict = {
+            "nombre": cliente_nombre,
+            "direccion": cliente_direccion,
+            "telefono": cliente_telefono,
+            "modelo_maquina": cliente_modelo,
+            "fecha": cliente_fecha.strftime("%d/%m/%Y")
+        }
+
         generar_pdf_informe(
             nombre_archivo=pdf_path,
-            datos_cliente={"nombre": nombre_cliente, "ubicacion": ubicacion_cliente},
-            resultado_calculo=resultado
+            datos_cliente=datos_cliente_dict,
+            resultado_calculo=resultado,
+            fotos_nameplates=rutas_fotos_guardadas
         )
 
         with open(pdf_path, "rb") as f:
             st.download_button(
                 label="📄 Descargar Informe Técnico Oficial en PDF",
                 data=f,
-                file_name=f"Informe_Tecnico_{nombre_cliente.replace(' ', '_')}.pdf",
+                file_name=f"Informe_Tecnico_{cliente_nombre.replace(' ', '_')}.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
