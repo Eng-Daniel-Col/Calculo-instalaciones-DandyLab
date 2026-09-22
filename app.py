@@ -13,6 +13,41 @@ st.set_page_config(
     layout="wide"
 )
 
+# app.py (Inicio del archivo)
+import streamlit as st
+
+# Configuración de contraseñas autorizadas para tu equipo
+USUARIOS_AUTORIZADOS = {
+    "daniel": "dandylab2026*",
+    "tecnico1": "laser2026",
+    "tecnico2": "retie2026"
+}
+
+def verificar_login():
+    if "autenticado" not in st.session_state:
+        st.session_state.autenticado = False
+
+    if not st.session_state.autenticado:
+        st.subheader("🔒 Acceso Restringido - DandyLab Soluciones")
+        usuario = st.text_input("Usuario")
+        clave = st.text_input("Contraseña", type="password")
+        
+        if st.button("Iniciar Sesión", type="primary"):
+            if usuario in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[usuario] == clave:
+                st.session_state.autenticado = True
+                st.success("Acceso concedido")
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos")
+        return False
+    return True
+
+# Si no está autenticado, detiene la ejecución del resto de la app
+if not verificar_login():
+    st.stop()
+
+# --- AQUÍ CONTINÚA TODO EL CÓDIGO ACTUAL DE TU APP ---
+
 # Previene errores de reconciliación DOM con traductores del navegador
 st.markdown('<html lang="es"></html>', unsafe_allow_html=True)
 
