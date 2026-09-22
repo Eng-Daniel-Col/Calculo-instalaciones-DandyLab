@@ -18,9 +18,9 @@ import streamlit as st
 
 # Configuración de contraseñas autorizadas para tu equipo
 USUARIOS_AUTORIZADOS = {
-    "daniel": "dandylab2026*",
-    "tecnico1": "laser2026",
-    "tecnico2": "retie2026"
+    "Eng.daniel": "dandylab2026*",
+    "Eng.sebastian": "laser2026",
+    "Eng.dannier": "test2026"
 }
 
 def verificar_login():
