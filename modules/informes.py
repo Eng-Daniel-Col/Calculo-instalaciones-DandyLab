@@ -9,9 +9,10 @@ from reportlab.lib import colors
 def generar_pdf_informe(
     nombre_archivo: str,
     datos_cliente: dict,
-    resultado_calculo: dict
+    resultado_calculo: dict,
+    fotos_nameplates: list = None
 ) -> str:
-    """Genera un informe técnico profesional en PDF para la instalación eléctrica."""
+    """Genera un informe técnico profesional en PDF incluyendo datos del cliente y fotos de placas."""
     doc = SimpleDocTemplate(
         nombre_archivo,
         pagesize=letter,
@@ -61,7 +62,7 @@ def generar_pdf_informe(
 
     story = []
 
-    # Búsqueda dinámica del logo dentro de la carpeta assets/logo
+    # 1. ENCABEZADO Y LOGO
     carpeta_logo = os.path.abspath(os.path.join("assets", "logo"))
     archivos_logo = glob.glob(os.path.join(carpeta_logo, "*.*"))
     
@@ -85,16 +86,20 @@ def generar_pdf_informe(
     story.append(Spacer(1, 10))
     story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#2563eb"), spaceAfter=15))
 
-    # 2. Datos del Proyecto
-    story.append(Paragraph("DATOS DEL PROYECTO", header_seccion))
+    # 2. DATOS DEL CLIENTE E INSTALACIÓN
+    story.append(Paragraph("INFORMACIÓN DEL CLIENTE E INSTALACIÓN", header_seccion))
     info_cliente = [
         [
-            Paragraph(f"<b>Cliente:</b> {datos_cliente.get('nombre', 'N/A')}", texto_normal),
-            Paragraph(f"<b>Ubicación:</b> {datos_cliente.get('ubicacion', 'N/A')}", texto_normal)
+            Paragraph(f"<b>Cliente / Empresa:</b> {datos_cliente.get('nombre', 'N/A')}", texto_normal),
+            Paragraph(f"<b>Teléfono:</b> {datos_cliente.get('telefono', 'N/A')}", texto_normal)
         ],
         [
-            Paragraph(f"<b>Norma Evaluada:</b> {resultado_calculo['norma_aplicada']}", texto_normal),
-            Paragraph(f"<b>Fecha:</b> {datos_cliente.get('fecha', '15/09/2026')}", texto_normal)
+            Paragraph(f"<b>Dirección:</b> {datos_cliente.get('direccion', 'N/A')}", texto_normal),
+            Paragraph(f"<b>Modelo / ID Máquina:</b> {datos_cliente.get('modelo_maquina', 'N/A')}", texto_normal)
+        ],
+        [
+            Paragraph(f"<b>Norma Evaluada:</b> {resultado_calculo.get('norma_aplicada', 'N/A')}", texto_normal),
+            Paragraph(f"<b>Fecha de Instalación:</b> {datos_cliente.get('fecha', 'N/A')}", texto_normal)
         ]
     ]
     t_cliente = Table(info_cliente, colWidths=[270, 270])
@@ -106,7 +111,7 @@ def generar_pdf_informe(
     story.append(t_cliente)
     story.append(Spacer(1, 15))
 
-    # 3. Cuadro de Cargas
+    # 3. CUADRO DE CARGAS - CIRCUITOS DERIVADOS
     story.append(Paragraph("CUADRO DE CARGAS - CIRCUITOS DERIVADOS", header_seccion))
     tabla_datos = [["Equipo", "Pot (kW)", "I. Dis (A)", "Cable AWG", "ΔV (%)", "Protección Breaker"]]
     for c in resultado_calculo["cuadro_cargas_circuitos"]:
@@ -133,7 +138,7 @@ def generar_pdf_informe(
     story.append(t_cuadro)
     story.append(Spacer(1, 15))
 
-    # 4. Tablero Principal
+    # 4. TABLERO PRINCIPAL / ALIMENTADOR
     story.append(Paragraph("ESPECIFICACIONES DEL TABLERO PRINCIPAL", header_seccion))
     tab = resultado_calculo["tablero_principal"]
     bp = tab["breaker_principal"]
@@ -153,9 +158,37 @@ def generar_pdf_informe(
         ('PADDING', (0,0), (-1,-1), 5)
     ]))
     story.append(t_principal)
-    story.append(Spacer(1, 25))
+    story.append(Spacer(1, 15))
 
-    # 5. Firma
+    # 5. REGISTRO FOTOGRÁFICO DE NAMEPLATES (SI EXISTEN)
+    if fotos_nameplates:
+        story.append(Paragraph("REGISTRO FOTOGRÁFICO (NAMEPLATES / PLACAS)", header_seccion))
+        tabla_fotos = []
+        fila_temp = []
+        for idx, foto_path in enumerate(fotos_nameplates):
+            if os.path.exists(foto_path):
+                img = Image(foto_path, width=240, height=140)
+                fila_temp.append(img)
+                if len(fila_temp) == 2:
+                    tabla_fotos.append(fila_temp)
+                    fila_temp = []
+        if fila_temp:
+            if len(fila_temp) == 1:
+                fila_temp.append(Paragraph("", texto_normal))
+            tabla_fotos.append(fila_temp)
+        
+        if tabla_fotos:
+            t_fotos = Table(tabla_fotos, colWidths=[270, 270])
+            t_fotos.setStyle(TableStyle([
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('PADDING', (0,0), (-1,-1), 5),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#cbd5e1"))
+            ]))
+            story.append(t_fotos)
+            story.append(Spacer(1, 15))
+
+    # 6. FIRMA TÉCNICA
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#94a3b8"), spaceAfter=15))
     story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Automatización e Instalaciones Industriales", texto_normal))
     story.append(Paragraph("Dandylab Soluciones | Medellín, Colombia", subtitulo_style))
