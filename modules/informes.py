@@ -81,7 +81,7 @@ def generar_pdf_informe(
     
     if archivos_logo:
         img_logo = Image(archivos_logo[0], width=110, height=45)
-        encabezado_data = [[img_logo, Paragraph("<b>DANDYLAB SOLUCIONES</b><br/><font size=8 color='#475569'>Servicios de Ingeniería | Instalaciones Industriales & Láser</font>", titulo_style)]]
+        encabezado_data = [[img_logo, Paragraph("<b>DANDYLAB SOLUCIONES</b><br/><font size=8 color='#475569'>Servicios de Ingeniería | Instalaciones Roboticas & Corte Láser </font>", titulo_style)]]
         t_header = Table(encabezado_data, colWidths=[120, 420])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
         story.append(t_header)
