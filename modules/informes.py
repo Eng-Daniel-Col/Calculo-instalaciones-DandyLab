@@ -171,7 +171,7 @@ def generar_pdf_informe(
 
     # 7. FIRMA
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#94a3b8"), spaceAfter=10))
-    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Automatización e Instalaciones Industriales", texto_normal))
+    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Automatización , Robotica y Fibra Láser", texto_normal))
     story.append(Paragraph("Dandylab Soluciones | Medellín, Colombia", subtitulo_style))
 
     doc.build(story)
