@@ -2,48 +2,42 @@
 
 def calcular_cuadro_completo(equipos, v_primario=220, v_secundario=380, pf=0.85, f_simultaneidad=1.0):
     """
-    Calcula el cuadro de cargas detallado por cada componente en kW, 
-    además de los parámetros del transformador y de la red del cliente.
+    Calcula la carga total, corriente primaria, transformador sugerido 
+    y el desglose por circuito derivado.
     """
-    potencia_total_kw = sum(eq["potencia_kw"] for eq in equipos)
+    potencia_total_kw = sum(eq.get("potencia_kw", 0.0) for eq in equipos)
     potencia_simultanea_kw = potencia_total_kw * f_simultaneidad
     potencia_aparente_kva = potencia_simultanea_kw / pf if pf > 0 else potencia_simultanea_kw
 
-    # Lado Secundario (Lado Máquina)
-    # I = (kW * 1000) / (sqrt(3) * V_sec * PF)
-    i_nom_sec = (potencia_simultanea_kw * 1000) / (1.732 * v_secundario * pf)
+    # Lado Secundario (Máquina)
+    i_nom_sec = (potencia_simultanea_kw * 1000) / (1.732 * v_secundario * pf) if v_secundario > 0 else 0
     i_diseno_sec = i_nom_sec * 1.25
 
-    # Lado Primario (Red Cliente)
-    # Eficiencia del transformador ~ 95%
+    # Lado Primario (Red Cliente - Eficiencia ~95%)
     potencia_primario_kw = potencia_simultanea_kw / 0.95
-    i_nom_prim = (potencia_primario_kw * 1000) / (1.732 * v_primario * pf)
+    i_nom_prim = (potencia_primario_kw * 1000) / (1.732 * v_primario * pf) if v_primario > 0 else 0
     i_diseno_prim = i_nom_prim * 1.25
 
-    # Capacidad sugerida para el transformador (kVA)
+    # Transformador comercial sugerido
     kvas_estandar = [5, 7.5, 10, 12, 15, 20, 25, 30, 45, 75, 112.5]
     transf_rec_kva = next((k for k in kvas_estandar if k >= potencia_aparente_kva * 1.2), round(potencia_aparente_kva * 1.25, 1))
 
-    # Selección de protecciones
     breaker_prim = seleccionar_breaker(i_diseno_prim)
     cable_prim = seleccionar_cable(i_diseno_prim)
 
-    # Procesar cada componente derivado
+    # Derivados por equipo
     circuitos_derivados = []
     for eq in equipos:
-        p_kw = eq["potencia_kw"]
+        p_kw = eq.get("potencia_kw", 0.0)
         i_nom = (p_kw * 1000) / (1.732 * v_secundario * pf) if v_secundario > 0 else 0
         i_dis = i_nom * 1.25
-        b_sug = seleccionar_breaker(i_dis)
-        c_sug = seleccionar_cable(i_dis)
-        
         circuitos_derivados.append({
-            "nombre": eq["nombre"],
-            "potencia_kw": p_kw,
+            "nombre": eq.get("nombre", "Componente"),
+            "potencia_kw": round(p_kw, 2),
             "i_nom_a": round(i_nom, 2),
             "i_diseno_a": round(i_dis, 2),
-            "breaker": f"{b_sug}A/3P",
-            "cable": c_sug
+            "breaker": f"{seleccionar_breaker(i_dis)}A/3P",
+            "cable": seleccionar_cable(i_dis)
         })
 
     return {
