@@ -1,131 +1,163 @@
 # modules/informes.py
 import io
+import os
+from PIL import Image as PILImage
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-def generar_pdf_informe(datos_cliente, resumen_carga, potencia_recomendada_kva, margen_seguridad, resumen_protecciones):
-    """
-    Genera el archivo PDF del informe técnico con la tabla de carga en kW y kVA.
-    """
+def generar_pdf_informe(datos_cliente, resumen, logo_path=None, fotos_nameplates=None, parametros_corte=None):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=letter,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=36
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=30,
+        bottomMargin=30
     )
 
     story = []
     styles = getSampleStyleSheet()
 
-    # Estilos personalizados
-    estilo_titulo = ParagraphStyle(
-        'TituloDandyLab',
-        parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
-        fontSize=18,
-        leading=22,
-        textColor=colors.HexColor("#1A365D"),
-        alignment=0
-    )
-    
-    estilo_subtitulo = ParagraphStyle(
-        'SubtituloDandyLab',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=11,
-        leading=14,
-        textColor=colors.HexColor("#475569")
-    )
+    titulo_style = ParagraphStyle('Titulo', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=14, textColor=colors.HexColor("#1A365D"), leading=16)
+    sub_style = ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica', fontSize=9, textColor=colors.HexColor("#475569"), leading=11)
+    sec_style = ParagraphStyle('Sec', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor("#1A365D"), leading=12)
 
-    # 1. Encabezado
-    story.append(Paragraph("DANDYLAB SOLUCIONES", estilo_titulo))
-    story.append(Paragraph("Servicios de Ingeniería, Instalación y Mantenimiento Industrial", estilo_subtitulo))
-    story.append(Spacer(1, 15))
-
-    # 2. Datos Generales del Cliente
-    datos_cliente_tabla = [
-        ["Cliente / Empresa:", datos_cliente.get("nombre", "N/A"), "Fecha:", "2026"],
-        ["Ubicación:", datos_cliente.get("ciudad", "N/A"), "Modelo Máquina:", datos_cliente.get("modelo", "N/A")],
-        ["Fuente Láser:", datos_cliente.get("fuente", "N/A"), "Voltaje Red:", resumen_carga.get("voltaje_fases", "N/A")]
+    # 1. Encabezado con Logo
+    text_header = [
+        Paragraph("<b>DANDYLAB SOLUCIONES</b>", titulo_style),
+        Paragraph("Servicios de Ingeniería | Instalaciones Industriales & Láser", sub_style)
     ]
     
-    tabla_cliente = Table(datos_cliente_tabla, colWidths=[110, 180, 90, 160])
-    tabla_cliente.setStyle(TableStyle([
+    if logo_path and os.path.exists(logo_path):
+        tabla_header = Table([[Image(logo_path, width=70, height=45), text_header]], colWidths=[80, 472])
+    else:
+        tabla_header = Table([[text_header]], colWidths=[552])
+
+    tabla_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
+    story.append(tabla_header)
+    story.append(Spacer(1, 10))
+
+    # 2. Datos Cliente
+    datos_cli_tabla = [
+        [f"<b>Cliente / Empresa:</b> {datos_cliente['cliente']}", f"<b>Teléfono:</b> {datos_cliente['telefono']}"],
+        [f"<b>Dirección:</b> {datos_cliente['direccion']}", f"<b>Modelo Máquina:</b> {datos_cliente['modelo']}"],
+        [f"<b>Norma Evaluada:</b> {datos_cliente['norma']}", f"<b>Fecha Instalación:</b> {datos_cliente['fecha']}"]
+    ]
+    t_cli = Table(datos_cli_tabla, colWidths=[300, 252])
+    t_cli.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#F8FAFC")),
-        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
-        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 9),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
-    story.append(tabla_cliente)
-    story.append(Spacer(1, 15))
+    story.append(t_cli)
+    story.append(Spacer(1, 10))
 
-    # 3. Tabla de Requerimientos Energéticos (kW y kVA)
-    story.append(Paragraph("<b>1. Requerimiento Energético para Instalación (Entradas en kW)</b>", styles['Heading2']))
-    story.append(Spacer(1, 6))
+    # 3. Diagrama Unifilar
+    story.append(Paragraph("<b>ARQUITECTURA Y ESQUEMA UNIFILAR DE CONEXIÓN</b>", sec_style))
+    story.append(Spacer(1, 4))
 
-    datos_tabla_cargas = [
-        ["Parámetro / Concepto", "Valor Requerido"],
-        ["Potencia Fuente Láser (kW)", f"{resumen_carga['potencia_laser_kw']} kW"],
-        ["Potencia Equipos Auxiliares (kW)", f"{resumen_carga['consumo_auxiliares_kw']} kW"],
-        ["Potencia Activa Total Requerida (kW)", f"{resumen_carga['potencia_activa_kw']} kW"],
-        ["Potencia Aparente Nominal (kVA)", f"{resumen_carga['potencia_aparente_kva']} kVA"],
-        [f"Capacidad Recomendada en Red / Transf. (+{margen_seguridad}%)", f"{potencia_recomendada_kva} kVA"],
-        ["Tensión de Alimentación", f"{resumen_carga['voltaje_fases']}"],
-        ["Corriente Nominal Estimada por Fase", f"{resumen_carga['corriente_estimada_a']} A"]
-    ]
+    bloque_red = f"<b>RED CLIENTE</b><br/>{resumen['v_primario']}V (Trifásica)"
+    bloque_trafo = f"<b>TRANSFORMADOR</b><br/>Capacidad: {resumen['transformador_kva']} kVA<br/>Entrada: {resumen['v_primario']}V | Salida: {resumen['v_secundario']}V"
+    bloque_tablero = f"<b>TABLERO MÁQUINA</b><br/>Operación: {resumen['v_secundario']}V Trifásico<br/>Potencia Total: {resumen['potencia_total_kw']} kW"
 
-    tabla_cargas = Table(datos_tabla_cargas, colWidths=[280, 260])
-    tabla_cargas.setStyle(TableStyle([
+    tabla_unifilar = Table([[
+        Paragraph(bloque_red, sub_style),
+        Paragraph("➔", titulo_style),
+        Paragraph(bloque_trafo, sub_style),
+        Paragraph("➔", titulo_style),
+        Paragraph(bloque_tablero, sub_style)
+    ]], colWidths=[140, 20, 220, 20, 152])
+
+    tabla_unifilar.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (0,0), colors.HexColor("#E2E8F0")),
+        ('BACKGROUND', (2,0), (2,0), colors.HexColor("#FEF3C7")),
+        ('BACKGROUND', (4,0), (4,0), colors.HexColor("#E2E8F0")),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('GRID', (0,0), (0,0), 1, colors.HexColor("#94A3B8")),
+        ('GRID', (2,0), (2,0), 1, colors.HexColor("#D97706")),
+        ('GRID', (4,0), (4,0), 1, colors.HexColor("#94A3B8")),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(tabla_unifilar)
+    story.append(Spacer(1, 10))
+
+    # 4. Circuitos Derivados
+    story.append(Paragraph("<b>CIRCUITOS DERIVADOS (LADO MÁQUINA)</b>", sec_style))
+    story.append(Spacer(1, 4))
+
+    tabla_derivados_data = [["Equipo / Componente", "Pot (kW)", "I. Dis (A)", "Cable AWG", "Breaker"]]
+    for c in resumen["circuitos_derivados"]:
+        tabla_derivados_data.append([c["nombre"], f"{c['potencia_kw']} kW", f"{c['i_diseno_a']} A", c["cable"], c["breaker"]])
+
+    t_der = Table(tabla_derivados_data, colWidths=[180, 80, 90, 90, 112])
+    t_der.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1A365D")),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 9),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('FONTSIZE', (0,0), (-1,-1), 8),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
-        ('BACKGROUND', (0,3), (1,3), colors.HexColor("#F1F5F9")), # Destacar Total kW
-        ('BACKGROUND', (0,5), (1,5), colors.HexColor("#FEF3C7")), # Destacar kVA Recomendados
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
     ]))
-    story.append(tabla_cargas)
-    story.append(Spacer(1, 15))
+    story.append(t_der)
+    story.append(Spacer(1, 10))
 
-    # 4. Tabla de Especificación de Acometida y Protecciones
-    story.append(Paragraph("<b>2. Especificación de Protecciones y Conductores</b>", styles['Heading2']))
-    story.append(Spacer(1, 6))
+    # 5. Tabla de Parámetros de Corte Calibrados
+    if parametros_corte:
+        story.append(Paragraph("<b>TABLA DE PARÁMETROS DE CORTE CALIBRADOS</b>", sec_style))
+        story.append(Spacer(1, 4))
+        
+        tabla_params_data = [["Material", "Espesor", "Potencia", "Velocidad", "Gas Aux.", "Presión", "Foco"]]
+        for p in parametros_corte:
+            tabla_params_data.append([p["material"], p["espesor"], p["potencia"], p["velocidad"], p["gas"], p["presion"], p["foco"]])
 
-    datos_tabla_protecciones = [
-        ["Elemento de Protección / Conductor", "Especificación Sugerida"],
-        ["Corriente de Diseño (125% RETIE)", f"{resumen_protecciones['corriente_diseno_a']} A"],
-        ["Interruptor Termomagnético Principal (Breaker)", f"{resumen_protecciones['breaker_sugerido_a']} A"],
-        ["Calibre Recomendado de Conductor (Cu 75°C)", f"{resumen_protecciones['calibre_sugerido']}"]
-    ]
+        t_param = Table(tabla_params_data, colWidths=[132, 60, 70, 80, 70, 70, 70])
+        t_param.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#334155")),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ]))
+        story.append(t_param)
+        story.append(Spacer(1, 10))
 
-    tabla_protecciones = Table(datos_tabla_protecciones, colWidths=[280, 260])
-    tabla_protecciones.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#334155")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 9),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
-    ]))
-    story.append(tabla_protecciones)
-    story.append(Spacer(1, 15))
+    # 6. Registro Fotográfico de Nameplates
+    if fotos_nameplates:
+        story.append(Paragraph("<b>REGISTRO FOTOGRÁFICO DE PLACAS TÉCNICAS (NAMEPLATES)</b>", sec_style))
+        story.append(Spacer(1, 4))
 
-    # 5. Observaciones
-    story.append(Paragraph("<b>3. Observaciones Técnicas</b>", styles['Heading2']))
-    story.append(Spacer(1, 6))
-    story.append(Paragraph(datos_cliente.get("observaciones", "Sin observaciones."), styles['Normal']))
+        imgs_row = []
+        for file in fotos_nameplates:
+            img_bytes = io.BytesIO(file.getvalue())
+            reportlab_img = Image(img_bytes, width=160, height=120)
+            imgs_row.append(reportlab_img)
 
-    # Construir PDF
+        # Agrupar de 3 en 3 por fila
+        filas_imgs = [imgs_row[i:i + 3] for i in range(0, len(imgs_row), 3)]
+        t_fotos = Table(filas_imgs, colWidths=[184, 184, 184])
+        t_fotos.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ]))
+        story.append(t_fotos)
+        story.append(Spacer(1, 10))
+
+    # Pie de página
+    pie = Paragraph("<b>Ing. Daniel Araujo</b> | Especialista en Automatización, Robótica y Fibra Láser<br/>Dandylab Soluciones | Medellín, Colombia", sub_style)
+    story.append(pie)
+
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
