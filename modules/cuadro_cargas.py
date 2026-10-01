@@ -1,10 +1,6 @@
 # modules/cuadro_cargas.py
 
 def calcular_cuadro_completo(equipos, v_primario=220, v_secundario=380, pf=0.85, f_simultaneidad=1.0):
-    """
-    Calcula la carga total, corriente primaria, transformador sugerido 
-    y el desglose por circuito derivado.
-    """
     potencia_total_kw = sum(eq.get("potencia_kw", 0.0) for eq in equipos)
     potencia_simultanea_kw = potencia_total_kw * f_simultaneidad
     potencia_aparente_kva = potencia_simultanea_kw / pf if pf > 0 else potencia_simultanea_kw
@@ -52,6 +48,10 @@ def calcular_cuadro_completo(equipos, v_primario=220, v_secundario=380, pf=0.85,
         "cable_primario": cable_prim,
         "circuitos_derivados": circuitos_derivados
     }
+
+# Alias para mantener compatibilidad con la importación en app.py
+def generar_cuadro_de_cargas(equipos, v_primario=220, v_secundario=380, pf=0.85):
+    return calcular_cuadro_completo(equipos, v_primario, v_secundario, pf)
 
 def seleccionar_breaker(corriente_a):
     breakers = [10, 15, 20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 225, 250, 300, 400]
