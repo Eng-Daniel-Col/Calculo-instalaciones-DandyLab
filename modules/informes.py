@@ -1,163 +1,134 @@
-# modules/informes.py
-import io
-import os
-from PIL import Image as PILImage
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# modules/cuadro_cargas.py
+import math
 
-def generar_pdf_informe(datos_cliente, resumen, logo_path=None, fotos_nameplates=None, parametros_corte=None):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=30,
-        leftMargin=30,
-        topMargin=30,
-        bottomMargin=30
-    )
+TABLA_AWG = [
+    {"awg": "14 AWG", "capacidad_a": 15},
+    {"awg": "12 AWG", "capacidad_a": 20},
+    {"awg": "10 AWG", "capacidad_a": 30},
+    {"awg": "8 AWG",  "capacidad_a": 50},
+    {"awg": "6 AWG",  "capacidad_a": 65},
+    {"awg": "4 AWG",  "capacidad_a": 85},
+    {"awg": "2 AWG",  "capacidad_a": 115},
+    {"awg": "1/0 AWG", "capacidad_a": 150},
+    {"awg": "2/0 AWG", "capacidad_a": 175},
+    {"awg": "4/0 AWG", "capacidad_a": 230},
+    {"awg": "250 kcmil", "capacidad_a": 255},
+    {"awg": "350 kcmil", "capacidad_a": 310},
+]
 
-    story = []
-    styles = getSampleStyleSheet()
+BREAKERS_ESTANDAR = [15, 20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 225, 250, 300, 400, 600]
 
-    titulo_style = ParagraphStyle('Titulo', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=14, textColor=colors.HexColor("#1A365D"), leading=16)
-    sub_style = ParagraphStyle('Sub', parent=styles['Normal'], fontName='Helvetica', fontSize=9, textColor=colors.HexColor("#475569"), leading=11)
-    sec_style = ParagraphStyle('Sec', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor("#1A365D"), leading=12)
+def seleccionar_cable(corriente_a: float) -> str:
+    for c in TABLA_AWG:
+        if c["capacidad_a"] >= corriente_a:
+            return c["awg"]
+    return "350 kcmil o superior"
 
-    # 1. Encabezado con Logo
-    text_header = [
-        Paragraph("<b>DANDYLAB SOLUCIONES</b>", titulo_style),
-        Paragraph("Servicios de Ingeniería | Instalaciones Industriales & Láser", sub_style)
-    ]
-    
-    if logo_path and os.path.exists(logo_path):
-        tabla_header = Table([[Image(logo_path, width=70, height=45), text_header]], colWidths=[80, 472])
+def seleccionar_breaker(corriente_diseno_a: float) -> int:
+    for b in BREAKERS_ESTANDAR:
+        if b >= corriente_diseno_a:
+            return b
+    return BREAKERS_ESTANDAR[-1]
+
+def calcular_caida_tension(corriente_a: float, distancia_m: float, voltaje: float, fases: int) -> float:
+    # Resistencia aproximada del cobre (K = 12.9)
+    if fases == 3:
+        delta_v = (math.sqrt(3) * corriente_a * distancia_m * 0.002)
     else:
-        tabla_header = Table([[text_header]], colWidths=[552])
+        delta_v = (2 * corriente_a * distancia_m * 0.002)
+    return round((delta_v / voltaje) * 100, 2)
 
-    tabla_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
-    story.append(tabla_header)
-    story.append(Spacer(1, 10))
+def generar_cuadro_de_cargas(datos_tablero: dict, lista_equipos: list, pais_norma: str = "COLOMBIA") -> dict:
+    usar_trafo = datos_tablero.get("usar_transformador", False)
+    v_primario = datos_tablero.get("voltaje_primario", 220)
+    fases_primario = datos_tablero.get("fases_primario", 3)
+    
+    v_secundario = datos_tablero.get("voltaje_secundario", 380) if usar_trafo else datos_tablero.get("voltaje", 220)
+    fases_secundario = datos_tablero.get("fases_secundario", 3)
+    
+    eficiencia_trafo = datos_tablero.get("eficiencia_trafo", 0.95) if usar_trafo else 1.0
 
-    # 2. Datos Cliente
-    datos_cli_tabla = [
-        [f"<b>Cliente / Empresa:</b> {datos_cliente['cliente']}", f"<b>Teléfono:</b> {datos_cliente['telefono']}"],
-        [f"<b>Dirección:</b> {datos_cliente['direccion']}", f"<b>Modelo Máquina:</b> {datos_cliente['modelo']}"],
-        [f"<b>Norma Evaluada:</b> {datos_cliente['norma']}", f"<b>Fecha Instalación:</b> {datos_cliente['fecha']}"]
-    ]
-    t_cli = Table(datos_cli_tabla, colWidths=[300, 252])
-    t_cli.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#F8FAFC")),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-    ]))
-    story.append(t_cli)
-    story.append(Spacer(1, 10))
+    cuadro_circuitos = []
+    potencia_total_w = 0.0
 
-    # 3. Diagrama Unifilar
-    story.append(Paragraph("<b>ARQUITECTURA Y ESQUEMA UNIFILAR DE CONEXIÓN</b>", sec_style))
-    story.append(Spacer(1, 4))
+    # 1. CIRCUITOS DERIVADOS (Alimentados al voltaje secundario / lado máquina)
+    for eq in lista_equipos:
+        pot_w = eq["potencia_w"]
+        volt = v_secundario
+        f = eq.get("fases", fases_secundario)
+        fp = eq.get("fp", 0.85)
+        dist = eq.get("distancia_m", 10.0)
 
-    bloque_red = f"<b>RED CLIENTE</b><br/>{resumen['v_primario']}V (Trifásica)"
-    bloque_trafo = f"<b>TRANSFORMADOR</b><br/>Capacidad: {resumen['transformador_kva']} kVA<br/>Entrada: {resumen['v_primario']}V | Salida: {resumen['v_secundario']}V"
-    bloque_tablero = f"<b>TABLERO MÁQUINA</b><br/>Operación: {resumen['v_secundario']}V Trifásico<br/>Potencia Total: {resumen['potencia_total_kw']} kW"
+        potencia_total_w += pot_w
 
-    tabla_unifilar = Table([[
-        Paragraph(bloque_red, sub_style),
-        Paragraph("➔", titulo_style),
-        Paragraph(bloque_trafo, sub_style),
-        Paragraph("➔", titulo_style),
-        Paragraph(bloque_tablero, sub_style)
-    ]], colWidths=[140, 20, 220, 20, 152])
+        if f == 3:
+            i_nom = pot_w / (math.sqrt(3) * volt * fp)
+        else:
+            i_nom = pot_w / (volt * fp)
 
-    tabla_unifilar.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (0,0), colors.HexColor("#E2E8F0")),
-        ('BACKGROUND', (2,0), (2,0), colors.HexColor("#FEF3C7")),
-        ('BACKGROUND', (4,0), (4,0), colors.HexColor("#E2E8F0")),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('GRID', (0,0), (0,0), 1, colors.HexColor("#94A3B8")),
-        ('GRID', (2,0), (2,0), 1, colors.HexColor("#D97706")),
-        ('GRID', (4,0), (4,0), 1, colors.HexColor("#94A3B8")),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-    ]))
-    story.append(tabla_unifilar)
-    story.append(Spacer(1, 10))
+        i_diseno = i_nom * 1.25  # Factor continuo 125%
+        cable = seleccionar_cable(i_diseno)
+        brk = seleccionar_breaker(i_diseno)
+        caida = calcular_caida_tension(i_nom, dist, volt, f)
 
-    # 4. Circuitos Derivados
-    story.append(Paragraph("<b>CIRCUITOS DERIVADOS (LADO MÁQUINA)</b>", sec_style))
-    story.append(Spacer(1, 4))
+        cuadro_circuitos.append({
+            "equipo": eq["nombre"],
+            "potencia_kw": round(pot_w / 1000, 2),
+            "corriente_diseno_a": round(i_diseno, 2),
+            "cable_awg": cable,
+            "caida_pct": caida,
+            "breaker": f"{brk}A / {f}P"
+        })
 
-    tabla_derivados_data = [["Equipo / Componente", "Pot (kW)", "I. Dis (A)", "Cable AWG", "Breaker"]]
-    for c in resumen["circuitos_derivados"]:
-        tabla_derivados_data.append([c["nombre"], f"{c['potencia_kw']} kW", f"{c['i_diseno_a']} A", c["cable"], c["breaker"]])
+    # 2. LADO SECUNDARIO DEL TRANSFORMADOR (Salida a Máquina - 380V Trifásico)
+    fp_promedio = 0.90
+    if fases_secundario == 3:
+        i_secundaria_nom = potencia_total_w / (math.sqrt(3) * v_secundario * fp_promedio)
+    else:
+        i_secundaria_nom = potencia_total_w / (v_secundario * fp_promedio)
+    i_secundaria_diseno = i_secundaria_nom * 1.25
 
-    t_der = Table(tabla_derivados_data, colWidths=[180, 80, 90, 90, 112])
-    t_der.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1A365D")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-    ]))
-    story.append(t_der)
-    story.append(Spacer(1, 10))
+    # 3. LADO PRIMARIO DEL TRANSFORMADOR (Acometida Red Cliente)
+    potencia_primario_w = potencia_total_w / eficiencia_trafo
 
-    # 5. Tabla de Parámetros de Corte Calibrados
-    if parametros_corte:
-        story.append(Paragraph("<b>TABLA DE PARÁMETROS DE CORTE CALIBRADOS</b>", sec_style))
-        story.append(Spacer(1, 4))
-        
-        tabla_params_data = [["Material", "Espesor", "Potencia", "Velocidad", "Gas Aux.", "Presión", "Foco"]]
-        for p in parametros_corte:
-            tabla_params_data.append([p["material"], p["espesor"], p["potencia"], p["velocidad"], p["gas"], p["presion"], p["foco"]])
+    if fases_primario == 3:
+        i_primaria_nom = potencia_primario_w / (math.sqrt(3) * v_primario * fp_promedio)
+    else:
+        i_primaria_nom = potencia_primario_w / (v_primario * fp_promedio)
+    
+    i_primaria_diseno = i_primaria_nom * 1.25
 
-        t_param = Table(tabla_params_data, colWidths=[132, 60, 70, 80, 70, 70, 70])
-        t_param.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#334155")),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0,0), (-1,-1), 8),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ]))
-        story.append(t_param)
-        story.append(Spacer(1, 10))
+    cable_primario = seleccionar_cable(i_primaria_diseno)
+    breaker_primario = seleccionar_breaker(i_primaria_diseno)
+    caida_primaria = calcular_caida_tension(i_primaria_nom, datos_tablero.get("distancia_acometida_m", 15.0), v_primario, fases_primario)
 
-    # 6. Registro Fotográfico de Nameplates
-    if fotos_nameplates:
-        story.append(Paragraph("<b>REGISTRO FOTOGRÁFICO DE PLACAS TÉCNICAS (NAMEPLATES)</b>", sec_style))
-        story.append(Spacer(1, 4))
+    # Margen de seguridad del 20% para el transformador
+    kva_transformador = math.ceil((potencia_primario_w / 1000) * 1.2)
 
-        imgs_row = []
-        for file in fotos_nameplates:
-            img_bytes = io.BytesIO(file.getvalue())
-            reportlab_img = Image(img_bytes, width=160, height=120)
-            imgs_row.append(reportlab_img)
-
-        # Agrupar de 3 en 3 por fila
-        filas_imgs = [imgs_row[i:i + 3] for i in range(0, len(imgs_row), 3)]
-        t_fotos = Table(filas_imgs, colWidths=[184, 184, 184])
-        t_fotos.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('TOPPADDING', (0,0), (-1,-1), 4),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ]))
-        story.append(t_fotos)
-        story.append(Spacer(1, 10))
-
-    # Pie de página
-    pie = Paragraph("<b>Ing. Daniel Araujo</b> | Especialista en Automatización, Robótica y Fibra Láser<br/>Dandylab Soluciones | Medellín, Colombia", sub_style)
-    story.append(pie)
-
-    doc.build(story)
-    buffer.seek(0)
-    return buffer.getvalue()
+    return {
+        "norma_aplicada": f"RETIE / NTC 2050 ({pais_norma})",
+        "usar_transformador": usar_trafo,
+        "cuadro_cargas_circuitos": cuadro_circuitos,
+        "transformador": {
+            "capacidad_sugerida_kva": kva_transformador,
+            "v_primario": v_primario,
+            "fases_primario": fases_primario,
+            "v_secundario": v_secundario,
+            "fases_secundario": fases_secundario,
+            "eficiencia": f"{int(eficiencia_trafo * 100)}%"
+        },
+        "tablero_principal": {
+            "potencia_total_kw": round(potencia_total_w / 1000, 2),
+            "potencia_primario_kw": round(potencia_primario_w / 1000, 2),
+            "corriente_diseno_a": round(i_primaria_diseno, 2),
+            "corriente_secundaria_a": round(i_secundaria_diseno, 2),
+            "alimentador_awg": cable_primario,
+            "caida_acometida_pct": caida_primaria,
+            "breaker_principal": {
+                "amperios": breaker_primario,
+                "polos": fases_primario,
+                "capacidad_interrupcion_ka": 10 if i_primaria_diseno <= 100 else 18,
+                "curva": "C / D"
+            }
+        }
+    }
