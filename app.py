@@ -15,161 +15,184 @@ st.set_page_config(
 
 # app.py
 import streamlit as st
-from modules.cuadro_cargas import calcular_carga_red_cliente, calcular_calibre_y_breaker
+import os
+from PIL import Image
+from modules.cuadro_cargas import calcular_cuadro_completo
 from modules.informes import generar_pdf_informe
 
 st.set_page_config(
-    page_title="DandyLab Soluciones - Reportes de Instalación",
+    page_title="DandyLab Soluciones - Reportes Técnicos",
     page_icon="⚡",
     layout="wide"
 )
 
-# --- SISTEMA DE AUTENTICACIÓN / LOGIN ---
-USUARIOS_AUTORIZADOS = {
-    "Eng.daniel": "dandylab2026*",
-    "Eng.sebastian": "laser2026",
-    "Eng.dannier": "test2026"
-}
+# --- LOGIN ---
+USUARIOS = {"daniel": "dandylab2026*", "tecnico1": "laser2026"}
 
-def verificar_login():
-    if "autenticado" not in st.session_state:
-        st.session_state.autenticado = False
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
 
-    if not st.session_state.autenticado:
-        st.title("⚡ DandyLab Soluciones")
-        st.subheader("🔒 Acceso Restringido - Instalaciones y Servicios")
-        
-        col_login, _ = st.columns([1, 1])
-        with col_login:
-            usuario = st.text_input("Usuario")
-            clave = st.text_input("Contraseña", type="password")
-            
-            if st.button("Iniciar Sesión", type="primary", use_container_width=True):
-                if usuario in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[usuario] == clave:
-                    st.session_state.autenticado = True
-                    st.success("Acceso concedido")
-                    st.rerun()
-                else:
-                    st.error("Usuario o contraseña incorrectos")
-        return False
-    return True
-
-if not verificar_login():
+if not st.session_state.autenticado:
+    st.title("⚡ DandyLab Soluciones")
+    u = st.text_input("Usuario")
+    p = st.text_input("Contraseña", type="password")
+    if st.button("Iniciar Sesión", type="primary"):
+        if u in USUARIOS and USUARIOS[u] == p:
+            st.session_state.autenticado = True
+            st.rerun()
+        else:
+            st.error("Credenciales incorrectas")
     st.stop()
 
-# --- INTERFAZ PRINCIPAL DE LA APLICACIÓN ---
-st.title("⚡ DandyLab Soluciones - Gestión de Instalación Laser")
+# --- DATOS GENERALES Y LOGO EN SIDEBAR ---
+st.sidebar.header("🖼️ Logo de la Empresa")
+logo_file = st.sidebar.file_uploader("Subir Logo (PNG/JPG)", type=["png", "jpg", "jpeg"])
+logo_path = "assets/logo/logo_temp.png"
+os.makedirs("assets/logo", exist_ok=True)
 
-# Formulario de datos generales del cliente
+if logo_file:
+    with open(logo_path, "wb") as f:
+        f.write(logo_file.getbuffer())
+    st.sidebar.image(logo_path, width=140)
+elif not os.path.exists(logo_path):
+    logo_path = None
+
 st.sidebar.header("📋 Datos de la Instalación")
-nombre_cliente = st.sidebar.text_input("Cliente / Empresa", value="Empresa Cliente S.A.S.")
-ciudad = st.sidebar.text_input("Ciudad / Ubicación", value="Medellín")
-modelo_maquina = st.sidebar.text_input("Modelo de Cortadora Láser", value="Laser Cut 3015")
-marca_fuente = st.sidebar.text_input("Marca / Serie de Fuente", value="Raycus 6kW")
+cliente = st.sidebar.text_input("Cliente / Empresa", "Empresa Ejemplo S.A.S.")
+direccion = st.sidebar.text_input("Dirección", "Calle Principal # 45-67")
+telefono = st.sidebar.text_input("Teléfono", "+57 300 000 0000")
+modelo = st.sidebar.text_input("Modelo Máquina", "MAQ-2026-X")
+fecha = st.sidebar.text_input("Fecha", "22/09/2026")
+norma = st.sidebar.text_input("Norma Evaluada", "RETIE/NTC 2050 (COLOMBIA)")
 
-# Pestañas principales
-tab_cargas, tab_informe = st.tabs(["⚡ Carga Eléctrica (kW)", "📄 Generar Informe PDF"])
+# Pestañas
+tab_cargas, tab_fotos, tab_parametros, tab_pdf = st.tabs([
+    "⚡ Carga y Componentes", 
+    "📷 Nameplates / Fotos", 
+    "🎯 Parámetros de Corte", 
+    "📄 Generar PDF"
+])
 
+# 1. TAB CARGAS Y COMPONENTES
 with tab_cargas:
-    st.header("⚡ Requerimiento Energético y Carga en Red (kW)")
-    st.caption("Ingrese la potencia en kilovatios (kW) de la fuente láser y los equipos auxiliares.")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        potencia_laser_kw = st.number_input(
-            "Potencia de Fuente Láser / Módulo Principal (kW)", 
-            min_value=0.5, 
-            value=6.0, 
-            step=0.5,
-            help="Ingrese la potencia de la fuente láser en kW"
-        )
-        
-        consumo_aux_kw = st.number_input(
-            "Consumo Equipos Auxiliares (kW)", 
-            min_value=0.0, 
-            value=8.0, 
-            step=0.5,
-            help="Suma de potencias en kW del Chiller, Extractor de humo, Compresor y servomotores"
-        )
-
-    with col2:
-        voltaje_red = st.selectbox(
-            "Voltaje de Red del Cliente", 
-            ["220V (3Ph)", "380V (3Ph)", "440V (3Ph)", "220V (1Ph/2Ph)"]
-        )
-        
-        margen_seguridad = st.slider(
-            "Margen de Seguridad de Red (%)", 
-            min_value=10, 
-            max_value=40, 
-            value=25, 
-            step=5
-        )
-
-    # Cálculo de carga en red
-    resumen_carga = calcular_carga_red_cliente(potencia_laser_kw, consumo_aux_kw, voltaje_red)
-    potencia_recomendada_kva = round(resumen_carga["potencia_aparente_kva"] * (1 + margen_seguridad/100), 1)
+    st.header("🔌 Voltajes y Componentes (kW)")
     
-    # Cálculo de protecciones y conductores
-    resumen_protecciones = calcular_calibre_y_breaker(resumen_carga["corriente_estimada_a"])
+    col_v1, col_v2 = st.columns(2)
+    with col_v1:
+        v_primario = st.number_input("Voltaje Red Cliente (V)", value=220, step=10)
+    with col_v2:
+        v_secundario = st.number_input("Voltaje Lado Máquina (V)", value=380, step=10)
 
-    # Guardar resultados en el estado de sesión
-    st.session_state.resumen_carga = resumen_carga
-    st.session_state.potencia_recomendada_kva = potencia_recomendada_kva
-    st.session_state.margen_seguridad = margen_seguridad
-    st.session_state.resumen_protecciones = resumen_protecciones
+    if "lista_equipos" not in st.session_state:
+        st.session_state.lista_equipos = [
+            {"nombre": "Fuente Láser", "potencia_kw": 6.0},
+            {"nombre": "Chiller de Enfriamiento", "potencia_kw": 3.0}
+        ]
 
-    # Despliegue visual de resultados
-    st.subheader("📊 Resumen de Cargas y Acometida Calculadas")
+    for i, eq in enumerate(st.session_state.lista_equipos):
+        c1, c2, c3 = st.columns([3, 2, 1])
+        with c1:
+            eq["nombre"] = st.text_input(f"Componente #{i+1}", value=eq["nombre"], key=f"nom_{i}")
+        with c2:
+            eq["potencia_kw"] = st.number_input(f"Potencia (kW)", min_value=0.1, value=float(eq["potencia_kw"]), step=0.5, key=f"kw_{i}")
+        with c3:
+            st.write(" ")
+            st.write(" ")
+            if st.button("❌", key=f"del_{i}"):
+                st.session_state.lista_equipos.pop(i)
+                st.rerun()
 
+    if st.button("➕ Agregar Componente"):
+        st.session_state.lista_equipos.append({"nombre": "Nuevo Equipo", "potencia_kw": 1.0})
+        st.rerun()
+
+    resumen = calcular_cuadro_completo(st.session_state.lista_equipos, v_primario, v_secundario)
+    st.session_state.resumen = resumen
+
+    st.markdown("---")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Potencia Total (kW)", f"{resumen_carga['potencia_activa_kw']} kW")
-    m2.metric("Potencia Aparente (kVA)", f"{resumen_carga['potencia_aparente_kva']} kVA")
-    m3.metric(f"Capacidad Red Rec. (+{margen_seguridad}%)", f"{potencia_recomendada_kva} kVA")
-    m4.metric("Corriente Nominal Est.", f"{resumen_carga['corriente_estimada_a']} A")
+    m1.metric("Potencia Total", f"{resumen['potencia_total_kw']} kW")
+    m2.metric("Transformador Rec.", f"{resumen['transformador_kva']} kVA")
+    m3.metric("Corriente Primaria", f"{resumen['i_diseno_primario']} A")
+    m4.metric("Breaker Sugerido", resumen['breaker_primario'])
 
-    st.subheader("🛡️ Protecciones y Conductores Sugeridos")
-    p1, p2, p3 = st.columns(3)
-    p1.metric("Corriente de Diseño (125%)", f"{resumen_protecciones['corriente_diseno_a']} A")
-    p2.metric("Breaker Principal Recomendado", f"{resumen_protecciones['breaker_sugerido_a']} A")
-    p3.metric("Calibre de Cable Cu (75°C)", f"{resumen_protecciones['calibre_sugerido']}")
+# 2. TAB FOTOS DE NAMEPLATES
+with tab_fotos:
+    st.header("📷 Registro Fotográfico de Nameplates / Placas Técnicas")
+    st.caption("Tome fotos con la cámara de su celular o adjunte imágenes de las placas de los equipos.")
 
-    st.success(
-        f"💡 **Recomendación para el cliente ({nombre_cliente}):**\n\n"
-        f"- **Carga activa total instalada:** {resumen_carga['potencia_activa_kw']} kW\n"
-        f"- **Transformador / Acometida requerida:** Mínimo **{potencia_recomendada_kva} kVA** a **{voltaje_red}**\n"
-        f"- **Protección general:** Breaker de **{resumen_protecciones['breaker_sugerido_a']} A** con conductor **{resumen_protecciones['calibre_sugerido']}**"
-    )
+    if "fotos_nameplates" not in st.session_state:
+        st.session_state.fotos_nameplates = []
 
-with tab_informe:
-    st.header("📄 Generación del Informe Técnico en PDF")
+    uploaded_files = st.file_uploader("Agregar fotos de Nameplates", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
     
-    observaciones = st.text_area(
-        "Observaciones Técnicas de la Instalación",
-        value="La acometida eléctrica fue verificada. Se recomienda asegurar la capacidad en kVA especificada y la conexión a tierra independiente antes del encendido inicial."
-    )
+    if uploaded_files:
+        st.session_state.fotos_nameplates = uploaded_files
 
-    if st.button("🚀 Generar PDF de la Instalación", type="primary"):
+    if st.session_state.fotos_nameplates:
+        cols = st.columns(3)
+        for idx, file in enumerate(st.session_state.fotos_nameplates):
+            with cols[idx % 3]:
+                img = Image.open(file)
+                st.image(img, caption=f"Foto Placa #{idx+1}", use_container_width=True)
+
+# 3. TAB PARÁMETROS DE CORTE
+with tab_parametros:
+    st.header("🎯 Parámetros de Corte Probados y Calibrados")
+    st.caption("Registre las recetas de corte para dejar como constancia técnica al cliente.")
+
+    if "parametros_corte" not in st.session_state:
+        st.session_state.parametros_corte = [
+            {"material": "Acero al Carbono (HR/CR)", "espesor": "3.0 mm", "potencia": "80%", "velocidad": "3.5 m/min", "gas": "O2", "presion": "0.8 Bar", "foco": "-1.5 mm"},
+            {"material": "Acero Inoxidable (304)", "espesor": "1.5 mm", "potencia": "100%", "velocidad": "12.0 m/min", "gas": "N2", "presion": "14.0 Bar", "foco": "+0.5 mm"}
+        ]
+
+    for i, p in enumerate(st.session_state.parametros_corte):
+        st.markdown(f"**Receta #{i+1}**")
+        col_p1, col_p2, col_p3, col_p4, col_p5, col_p6, col_p7, col_p8 = st.columns([2, 1.2, 1.2, 1.2, 1, 1, 1, 0.6])
+        
+        with col_p1: p["material"] = st.text_input("Material", value=p["material"], key=f"mat_{i}")
+        with col_p2: p["espesor"] = st.text_input("Espesor", value=p["espesor"], key=f"esp_{i}")
+        with col_p3: p["potencia"] = st.text_input("Potencia", value=p["potencia"], key=f"pot_{i}")
+        with col_p4: p["velocidad"] = st.text_input("Velocidad", value=p["velocidad"], key=f"vel_{i}")
+        with col_p5: p["gas"] = st.text_input("Gas", value=p["gas"], key=f"gas_{i}")
+        with col_p6: p["presion"] = st.text_input("Presión", value=p["presion"], key=f"pres_{i}")
+        with col_p7: p["foco"] = st.text_input("Foco", value=p["foco"], key=f"foc_{i}")
+        with col_p8:
+            st.write(" ")
+            st.write(" ")
+            if st.button("❌", key=f"del_param_{i}"):
+                st.session_state.parametros_corte.pop(i)
+                st.rerun()
+
+    if st.button("➕ Agregar Ficha de Corte"):
+        st.session_state.parametros_corte.append({
+            "material": "Aluminio", "espesor": "2.0 mm", "potencia": "90%", 
+            "velocidad": "6.0 m/min", "gas": "N2", "presion": "12.0 Bar", "foco": "0.0 mm"
+        })
+        st.rerun()
+
+# 4. TAB GENERAR PDF
+with tab_pdf:
+    st.header("📄 Generación de Reporte Completo")
+    
+    if st.button("🚀 Generar Informe PDF", type="primary"):
         datos_cliente = {
-            "nombre": nombre_cliente,
-            "ciudad": ciudad,
-            "modelo": modelo_maquina,
-            "fuente": marca_fuente,
-            "observaciones": observaciones
+            "cliente": cliente, "direccion": direccion, "telefono": telefono,
+            "modelo": modelo, "fecha": fecha, "norma": norma
         }
         
         pdf_bytes = generar_pdf_informe(
             datos_cliente=datos_cliente,
-            resumen_carga=st.session_state.resumen_carga,
-            potencia_recomendada_kva=st.session_state.potencia_recomendada_kva,
-            margen_seguridad=st.session_state.margen_seguridad,
-            resumen_protecciones=st.session_state.resumen_protecciones
+            resumen=st.session_state.resumen,
+            logo_path=logo_path,
+            fotos_nameplates=st.session_state.get("fotos_nameplates", []),
+            parametros_corte=st.session_state.get("parametros_corte", [])
         )
         
         st.download_button(
-            label="📥 Descargar Informe PDF",
+            label="📥 Descargar PDF Completo",
             data=pdf_bytes,
-            file_name=f"Informe_Instalacion_{nombre_cliente.replace(' ', '_')}.pdf",
+            file_name=f"Informe_Instalacion_{cliente.replace(' ', '_')}.pdf",
             mime="application/pdf"
         )
