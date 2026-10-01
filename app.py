@@ -44,155 +44,193 @@ if not st.session_state.autenticado:
             st.error("Credenciales incorrectas")
     st.stop()
 
-# --- DATOS GENERALES Y LOGO EN SIDEBAR ---
-st.sidebar.header("🖼️ Logo de la Empresa")
-logo_file = st.sidebar.file_uploader("Subir Logo (PNG/JPG)", type=["png", "jpg", "jpeg"])
-logo_path = "assets/logo/logo_temp.png"
-os.makedirs("assets/logo", exist_ok=True)
+# Previene errores de reconciliación DOM con traductores del navegador
+st.markdown('<html lang="es"></html>', unsafe_allow_html=True)
 
-if logo_file:
-    with open(logo_path, "wb") as f:
-        f.write(logo_file.getbuffer())
-    st.sidebar.image(logo_path, width=140)
-elif not os.path.exists(logo_path):
-    logo_path = None
+# Encabezado y Logo
+carpeta_logo = os.path.abspath(os.path.join("assets", "logo"))
+archivos_encontrados = glob.glob(os.path.join(carpeta_logo, "*.*"))
 
-st.sidebar.header("📋 Datos de la Instalación")
-cliente = st.sidebar.text_input("Cliente / Empresa", "Empresa Ejemplo S.A.S.")
-direccion = st.sidebar.text_input("Dirección", "Calle Principal # 45-67")
-telefono = st.sidebar.text_input("Teléfono", "+57 300 000 0000")
-modelo = st.sidebar.text_input("Modelo Máquina", "MAQ-2026-X")
-fecha = st.sidebar.text_input("Fecha", "22/09/2026")
-norma = st.sidebar.text_input("Norma Evaluada", "RETIE/NTC 2050 (COLOMBIA)")
+col_logo, col_titulo = st.columns([1, 4])
+with col_logo:
+    if archivos_encontrados:
+        st.image(archivos_encontrados[0], width=140)
+    else:
+        st.warning("⚠️ Sin logo en assets/logo/")
 
-# Pestañas
-tab_cargas, tab_fotos, tab_parametros, tab_pdf = st.tabs([
-    "⚡ Carga y Componentes", 
-    "📷 Nameplates / Fotos", 
-    "🎯 Parámetros de Corte", 
-    "📄 Generar PDF"
+with col_titulo:
+    st.title("⚡ DandyLab Soluciones")
+    st.caption("Dimensionamiento Eléctrico Industrial & Especializado bajo RETIE / NTC 2050")
+
+# Inicialización de estado con identificadores únicos
+if "equipos" not in st.session_state:
+    st.session_state.equipos = [
+        {"id": str(uuid.uuid4()), "nombre": "Fuente Láser", "potencia_w": 6000.0, "voltaje": 380.0, "fases": 3, "fp": 0.90, "distancia_m": 10.0},
+        {"id": str(uuid.uuid4()), "nombre": "Chiller de Enfriamiento", "potencia_w": 3000.0, "voltaje": 380.0, "fases": 3, "fp": 0.85, "distancia_m": 15.0}
+    ]
+
+tab_calc, tab_cliente, tab_fotos = st.tabs([
+    "📊 Calculadora Eléctrica", 
+    "📋 Datos del Cliente", 
+    "📷 Fotos y Parámetros"
 ])
 
-# 1. TAB CARGAS Y COMPONENTES
-with tab_cargas:
-    st.header("🔌 Voltajes y Componentes (kW)")
+# ---------------------------------------------------------
+# PESTAÑA 1: CALCULADORA ELÉCTRICA
+# ---------------------------------------------------------
+with tab_calc:
+    st.header("1. Configuración de Acometida y Transformador")
     
-    col_v1, col_v2 = st.columns(2)
-    with col_v1:
-        v_primario = st.number_input("Voltaje Red Cliente (V)", value=220, step=10)
-    with col_v2:
-        v_secundario = st.number_input("Voltaje Lado Máquina (V)", value=380, step=10)
+    usar_trafo = st.checkbox("🔌 La instalación incluye Transformador (Ej. 220V → 380V)", value=True)
+    
+    col_t1, col_t2, col_t3, col_t4, col_t5 = st.columns(5)
+    with col_t1:
+        v_primario = st.selectbox("Voltaje Red Cliente", [220, 440, 380, 110], index=0 if usar_trafo else 2)
+    with col_t2:
+        fases_primario = st.selectbox("Fases Red Cliente", [3, 2, 1], index=0, format_func=lambda x: f"{x}P / {'Trifásica' if x==3 else 'Bifásica' if x==2 else 'Monofásica'}")
+    with col_t3:
+        v_secundario = st.selectbox("Voltaje Máquina", [380, 220, 440], index=0)
+    with col_t4:
+        dist_acometida = st.number_input("Distancia Red -> Trafo (m)", min_value=1.0, value=15.0, step=1.0)
+    with col_t5:
+        norma_seleccionada = st.selectbox("Norma Aplicable", ["COLOMBIA", "MEXICO", "EEUU"], index=0)
 
-    if "lista_equipos" not in st.session_state:
-        st.session_state.lista_equipos = [
-            {"nombre": "Fuente Láser", "potencia_kw": 6.0},
-            {"nombre": "Chiller de Enfriamiento", "potencia_kw": 3.0}
-        ]
+    # Diagrama textual de flujo
+    st.subheader("💡 Arquitectura de Conexión Seleccionada")
+    str_fases = "Trifásica" if fases_primario == 3 else ("Bifásica" if fases_primario == 2 else "Monofásica")
+    if usar_trafo:
+        st.info(f"**RED CLIENTE ({v_primario}V {str_fases})** ──[Breaker {fases_primario}P]──> **TRANSFORMADOR** ──({v_secundario}V 3P)──> **TABLERO MÁQUINA** ──> **DERIVADOS**")
+    else:
+        st.info(f"**RED CLIENTE ({v_primario}V {str_fases})** ──[Breaker {fases_primario}P]──> **TABLERO MÁQUINA** ──> **DERIVADOS ({v_primario}V)**")
 
-    for i, eq in enumerate(st.session_state.lista_equipos):
-        c1, c2, c3 = st.columns([3, 2, 1])
-        with c1:
-            eq["nombre"] = st.text_input(f"Componente #{i+1}", value=eq["nombre"], key=f"nom_{i}")
-        with c2:
-            eq["potencia_kw"] = st.number_input(f"Potencia (kW)", min_value=0.1, value=float(eq["potencia_kw"]), step=0.5, key=f"kw_{i}")
-        with c3:
-            st.write(" ")
-            st.write(" ")
-            if st.button("❌", key=f"del_{i}"):
-                st.session_state.lista_equipos.pop(i)
+    st.header("2. Circuitos Derivados (Equipos de la Máquina)")
+    col_eq1, col_eq2, col_eq3, col_eq4, col_eq5 = st.columns([2, 1.5, 1.2, 1.2, 1])
+
+    with col_eq1:
+        nuevo_nombre = st.text_input("Nombre del Equipo", value="Extractor de Humos")
+    with col_eq2:
+        nueva_potencia = st.number_input("Potencia (Watts)", min_value=100.0, value=1500.0, step=100.0)
+    with col_eq3:
+        nuevas_fases = st.selectbox("Fases", [3, 1], index=0, key="nuevo_f")
+    with col_eq4:
+        nueva_distancia = st.number_input("Distancia (m)", min_value=1.0, value=15.0, step=1.0, key="nuevo_d")
+    with col_eq5:
+        st.write("##")
+        if st.button("➕ Agregar"):
+            st.session_state.equipos.append({
+                "id": str(uuid.uuid4()),
+                "nombre": nuevo_nombre,
+                "potencia_w": nueva_potencia,
+                "voltaje": v_secundario,
+                "fases": nuevas_fases,
+                "fp": 0.85,
+                "distancia_m": nueva_distancia
+            })
+            st.success(f"Equipo '{nuevo_nombre}' añadido.")
+
+    if st.session_state.equipos:
+        st.subheader("Lista de Equipos Registrados")
+        for eq in list(st.session_state.equipos):
+            c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 2, 1])
+            c1.write(f"**{eq['nombre']}**")
+            c2.write(f"⚡ {eq['potencia_w']} W")
+            c3.write(f"🌀 {'Trifásico' if eq['fases'] == 3 else 'Monofásico'}")
+            c4.write(f"📏 {eq['distancia_m']} m")
+            if c5.button("🗑️", key=f"del_{eq['id']}"):
+                st.session_state.equipos = [e for e in st.session_state.equipos if e["id"] != eq["id"]]
                 st.rerun()
 
-    if st.button("➕ Agregar Componente"):
-        st.session_state.lista_equipos.append({"nombre": "Nuevo Equipo", "potencia_kw": 1.0})
-        st.rerun()
+# ---------------------------------------------------------
+# PESTAÑA 2: DATOS DEL CLIENTE
+# ---------------------------------------------------------
+with tab_cliente:
+    st.header("Información del cliente e instalación")
+    cliente_nombre = st.text_input("Nombre / Empresa del Cliente", value="Empresa Ejemplo S.A.S.")
+    cliente_direccion = st.text_input("Dirección de la Instalación", value="Calle Principal # 45 - 67")
+    cliente_telefono = st.text_input("Teléfono de Contacto", value="+57 300 000 0000")
+    cliente_modelo = st.text_input("Modelo / ID de la Máquina", value="MAQ-2026-X")
+    cliente_fecha = st.date_input("Fecha de Instalación", value=datetime.now())
 
-    resumen = calcular_cuadro_completo(st.session_state.lista_equipos, v_primario, v_secundario)
-    st.session_state.resumen = resumen
-
-    st.markdown("---")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Potencia Total", f"{resumen['potencia_total_kw']} kW")
-    m2.metric("Transformador Rec.", f"{resumen['transformador_kva']} kVA")
-    m3.metric("Corriente Primaria", f"{resumen['i_diseno_primario']} A")
-    m4.metric("Breaker Sugerido", resumen['breaker_primario'])
-
-# 2. TAB FOTOS DE NAMEPLATES
+# ---------------------------------------------------------
+# PESTAÑA 3: FOTOS
+# ---------------------------------------------------------
 with tab_fotos:
-    st.header("📷 Registro Fotográfico de Nameplates / Placas Técnicas")
-    st.caption("Tome fotos con la cámara de su celular o adjunte imágenes de las placas de los equipos.")
+    st.header("Fotos y Registro de Nameplates (Placas de Características)")
+    archivos_subidos = st.file_uploader("Subir imágenes de Nameplates (JPG, PNG)", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+    rutas_fotos_guardadas = []
+    if archivos_subidos:
+        cols_foto = st.columns(3)
+        os.makedirs("temp_uploads", exist_ok=True)
+        for idx, file in enumerate(archivos_subidos):
+            temp_path = os.path.join("temp_uploads", f"nameplate_{idx}_{file.name}")
+            with open(temp_path, "wb") as f:
+                f.write(file.getbuffer())
+            rutas_fotos_guardadas.append(temp_path)
+            with cols_foto[idx % 3]:
+                st.image(file, caption=file.name, use_column_width=True)
 
-    if "fotos_nameplates" not in st.session_state:
-        st.session_state.fotos_nameplates = []
+# ---------------------------------------------------------
+# CÁLCULO GENERAL Y GENERACIÓN
+# ---------------------------------------------------------
+st.divider()
 
-    uploaded_files = st.file_uploader("Agregar fotos de Nameplates", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
-    
-    if uploaded_files:
-        st.session_state.fotos_nameplates = uploaded_files
-
-    if st.session_state.fotos_nameplates:
-        cols = st.columns(3)
-        for idx, file in enumerate(st.session_state.fotos_nameplates):
-            with cols[idx % 3]:
-                img = Image.open(file)
-                st.image(img, caption=f"Foto Placa #{idx+1}", use_container_width=True)
-
-# 3. TAB PARÁMETROS DE CORTE
-with tab_parametros:
-    st.header("🎯 Parámetros de Corte Probados y Calibrados")
-    st.caption("Registre las recetas de corte para dejar como constancia técnica al cliente.")
-
-    if "parametros_corte" not in st.session_state:
-        st.session_state.parametros_corte = [
-            {"material": "Acero al Carbono (HR/CR)", "espesor": "3.0 mm", "potencia": "80%", "velocidad": "3.5 m/min", "gas": "O2", "presion": "0.8 Bar", "foco": "-1.5 mm"},
-            {"material": "Acero Inoxidable (304)", "espesor": "1.5 mm", "potencia": "100%", "velocidad": "12.0 m/min", "gas": "N2", "presion": "14.0 Bar", "foco": "+0.5 mm"}
-        ]
-
-    for i, p in enumerate(st.session_state.parametros_corte):
-        st.markdown(f"**Receta #{i+1}**")
-        col_p1, col_p2, col_p3, col_p4, col_p5, col_p6, col_p7, col_p8 = st.columns([2, 1.2, 1.2, 1.2, 1, 1, 1, 0.6])
-        
-        with col_p1: p["material"] = st.text_input("Material", value=p["material"], key=f"mat_{i}")
-        with col_p2: p["espesor"] = st.text_input("Espesor", value=p["espesor"], key=f"esp_{i}")
-        with col_p3: p["potencia"] = st.text_input("Potencia", value=p["potencia"], key=f"pot_{i}")
-        with col_p4: p["velocidad"] = st.text_input("Velocidad", value=p["velocidad"], key=f"vel_{i}")
-        with col_p5: p["gas"] = st.text_input("Gas", value=p["gas"], key=f"gas_{i}")
-        with col_p6: p["presion"] = st.text_input("Presión", value=p["presion"], key=f"pres_{i}")
-        with col_p7: p["foco"] = st.text_input("Foco", value=p["foco"], key=f"foc_{i}")
-        with col_p8:
-            st.write(" ")
-            st.write(" ")
-            if st.button("❌", key=f"del_param_{i}"):
-                st.session_state.parametros_corte.pop(i)
-                st.rerun()
-
-    if st.button("➕ Agregar Ficha de Corte"):
-        st.session_state.parametros_corte.append({
-            "material": "Aluminio", "espesor": "2.0 mm", "potencia": "90%", 
-            "velocidad": "6.0 m/min", "gas": "N2", "presion": "12.0 Bar", "foco": "0.0 mm"
-        })
-        st.rerun()
-
-# 4. TAB GENERAR PDF
-with tab_pdf:
-    st.header("📄 Generación de Reporte Completo")
-    
-    if st.button("🚀 Generar Informe PDF", type="primary"):
-        datos_cliente = {
-            "cliente": cliente, "direccion": direccion, "telefono": telefono,
-            "modelo": modelo, "fecha": fecha, "norma": norma
+if st.button("🚀 Calcular Dimensionamiento y Generar Informe PDF", type="primary", use_container_width=True):
+    if not st.session_state.equipos:
+        st.error("Debes agregar al menos un equipo en la pestaña 'Calculadora Eléctrica'.")
+    else:
+        datos_tablero = {
+            "usar_transformador": usar_trafo,
+            "voltaje_primario": v_primario,
+            "fases_primario": fases_primario,
+            "voltaje_secundario": v_secundario,
+            "fases_secundario": 3,
+            "distancia_acometida_m": dist_acometida,
+            "eficiencia_trafo": 0.95
         }
-        
-        pdf_bytes = generar_pdf_informe(
-            datos_cliente=datos_cliente,
-            resumen=st.session_state.resumen,
-            logo_path=logo_path,
-            fotos_nameplates=st.session_state.get("fotos_nameplates", []),
-            parametros_corte=st.session_state.get("parametros_corte", [])
+
+        resultado = generar_cuadro_de_cargas(
+            datos_tablero=datos_tablero,
+            lista_equipos=st.session_state.equipos,
+            pais_norma=norma_seleccionada
         )
-        
-        st.download_button(
-            label="📥 Descargar PDF Completo",
-            data=pdf_bytes,
-            file_name=f"Informe_Instalacion_{cliente.replace(' ', '_')}.pdf",
-            mime="application/pdf"
+
+        st.subheader("📊 Resultados del Dimensionamiento")
+
+        if usar_trafo:
+            st.success(f"⚡ **Transformador Sugerido:** {resultado['transformador']['capacidad_sugerida_kva']} kVA ({v_primario}V {fases_primario}P ➔ {v_secundario}V 3P)")
+
+        col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+        tab_info = resultado["tablero_principal"]
+        col_r1.metric("Potencia Entrada", f"{tab_info['potencia_primario_kw']} kW")
+        col_r2.metric("Corriente Entrada (Primario)", f"{tab_info['corriente_diseno_a']} A")
+        col_r3.metric("Alimentador Principal", f"{tab_info['alimentador_awg']}")
+        col_r4.metric("Breaker Acometida", f"{tab_info['breaker_principal']['amperios']} A ({fases_primario}P)")
+
+        st.markdown("### Circuitos Derivados (Lado Máquina)")
+        st.dataframe(resultado["cuadro_cargas_circuitos"], use_container_width=True)
+
+        # Generación del PDF
+        pdf_path = "informe_dimensionamiento.pdf"
+        datos_cliente_dict = {
+            "nombre": cliente_nombre,
+            "direccion": cliente_direccion,
+            "telefono": cliente_telefono,
+            "modelo_maquina": cliente_modelo,
+            "fecha": cliente_fecha.strftime("%d/%m/%Y")
+        }
+
+        generar_pdf_informe(
+            nombre_archivo=pdf_path,
+            datos_cliente=datos_cliente_dict,
+            resultado_calculo=resultado,
+            fotos_nameplates=rutas_fotos_guardadas
         )
+
+        with open(pdf_path, "rb") as f:
+            st.download_button(
+                label="📄 Descargar Informe Técnico Oficial en PDF",
+                data=f,
+                file_name=f"Informe_Tecnico_{cliente_nombre.replace(' ', '_')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
