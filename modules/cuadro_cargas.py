@@ -83,3 +83,6 @@ def calcular_calibre_y_breaker(corriente_estimada_a, distancia_metros=20):
         "breaker_sugerido_a": breaker_sugerido,
         "calibre_sugerido": calibre
     }
+    # Alias de compatibilidad para evitar errores de importación anteriores
+def generar_cuadro_de_cargas(*args, **kwargs):
+    return calcular_carga_red_cliente(*args, **kwargs)
