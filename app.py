@@ -13,19 +13,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# app.py
-import streamlit as st
-import os
-from PIL import Image
-from modules.cuadro_cargas import calcular_cuadro_completo
-from modules.informes import generar_pdf_informe
-
-st.set_page_config(
-    page_title="DandyLab Soluciones - Reportes Técnicos",
-    page_icon="⚡",
-    layout="wide"
-)
-
 # --- LOGIN ---
 USUARIOS = {"daniel": "dandylab2026*", "tecnico1": "laser2026"}
 
