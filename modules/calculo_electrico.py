@@ -13,59 +13,48 @@ def validar_datos(tension, factor_potencia):
         )
 
 
+# calculo_electrico.py
+
 def calcular_corriente_monofasica(
-    potencia,
+    potencia_kw,
     tension,
     factor_potencia=1.0,
     eficiencia=1.0,
 ):
     """
-    Calcula la corriente de una carga monofásica.
+    Calcula la corriente de una carga monofásica (Potencia en kW).
 
-    I = P / (V × FP × eficiencia)
+    I = (P_kW × 1000) / (V × FP × eficiencia)
     """
-
     validar_datos(tension, factor_potencia)
 
     if eficiencia <= 0 or eficiencia > 1:
-        raise ValueError(
-            "La eficiencia debe estar entre 0 y 1."
-        )
+        raise ValueError("La eficiencia debe estar entre 0 y 1.")
 
-    return potencia / (
-        tension * factor_potencia * eficiencia
-    )
+    return (potencia_kw * 1000) / (tension * factor_potencia * eficiencia)
 
 
 def calcular_corriente_trifasica(
-    potencia,
+    potencia_kw,
     tension,
     factor_potencia=1.0,
     eficiencia=1.0,
 ):
     """
-    Calcula la corriente de una carga trifásica.
+    Calcula la corriente de una carga trifásica (Potencia en kW).
 
-    I = P / (√3 × V × FP × eficiencia)
+    I = (P_kW × 1000) / (√3 × V × FP × eficiencia)
     """
-
     validar_datos(tension, factor_potencia)
 
     if eficiencia <= 0 or eficiencia > 1:
-        raise ValueError(
-            "La eficiencia debe estar entre 0 y 1."
-        )
+        raise ValueError("La eficiencia debe estar entre 0 y 1.")
 
-    return potencia / (
-        math.sqrt(3)
-        * tension
-        * factor_potencia
-        * eficiencia
-    )
+    return (potencia_kw * 1000) / (math.sqrt(3) * tension * factor_potencia * eficiencia)
 
 
 def calcular_corriente(
-    potencia,
+    potencia_kw,
     tension,
     sistema,
     factor_potencia=1.0,
@@ -73,30 +62,21 @@ def calcular_corriente(
 ):
     """
     Calcula automáticamente la corriente
-    dependiendo del sistema seleccionado.
+    dependiendo del sistema seleccionado (potencia en kW).
     """
-
     sistema = sistema.lower()
 
     if sistema in ["monofásico", "monofasico"]:
         return calcular_corriente_monofasica(
-            potencia,
-            tension,
-            factor_potencia,
-            eficiencia,
+            potencia_kw, tension, factor_potencia, eficiencia
         )
 
     if sistema in ["trifásico", "trifasico"]:
         return calcular_corriente_trifasica(
-            potencia,
-            tension,
-            factor_potencia,
-            eficiencia,
+            potencia_kw, tension, factor_potencia, eficiencia
         )
 
-    raise ValueError(
-        "Sistema eléctrico no reconocido."
-    )
+    raise ValueError("Sistema eléctrico no reconocido.")
 
 
 def calcular_corriente_diseno(
