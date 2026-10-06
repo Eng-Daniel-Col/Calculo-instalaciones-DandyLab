@@ -1,134 +1,158 @@
 # modules/cuadro_cargas.py
 import math
 
-TABLA_AWG = [
-    {"awg": "14 AWG", "capacidad_a": 15},
-    {"awg": "12 AWG", "capacidad_a": 20},
-    {"awg": "10 AWG", "capacidad_a": 30},
-    {"awg": "8 AWG",  "capacidad_a": 50},
-    {"awg": "6 AWG",  "capacidad_a": 65},
-    {"awg": "4 AWG",  "capacidad_a": 85},
-    {"awg": "2 AWG",  "capacidad_a": 115},
-    {"awg": "1/0 AWG", "capacidad_a": 150},
-    {"awg": "2/0 AWG", "capacidad_a": 175},
-    {"awg": "4/0 AWG", "capacidad_a": 230},
-    {"awg": "250 kcmil", "capacidad_a": 255},
-    {"awg": "350 kcmil", "capacidad_a": 310},
-]
+def obtener_calibre_awg(corriente: float) -> str:
+    """Selecciona el calibre AWG / kcmil mínimo según la corriente de diseño (Tabla NTC 2050 / NEC 75°C)."""
+    tabla_ampacidad = [
+        (15, "14 AWG"),
+        (20, "12 AWG"),
+        (30, "10 AWG"),
+        (55, "8 AWG"),
+        (65, "6 AWG"),
+        (85, "4 AWG"),
+        (115, "2 AWG"),
+        (130, "1 AWG"),
+        (150, "1/0 AWG"),
+        (175, "2/0 AWG"),
+        (200, "3/0 AWG"),
+        (230, "4/0 AWG"),
+        (255, "250 kcmil"),
+        (285, "300 kcmil"),
+        (335, "400 kcmil"),
+        (380, "500 kcmil")
+    ]
+    for amp, calibre in tabla_ampacidad:
+        if corriente <= amp:
+            return calibre
+    return "500 kcmil (Especial/Paralelo)"
 
-BREAKERS_ESTANDAR = [15, 20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 225, 250, 300, 400, 600]
+def obtener_breaker_sugerido(corriente: float, fases: int) -> str:
+    """Calcula la protección térmica sugerida (125% por norma) y selecciona un valor comercial."""
+    i_proteccion = corriente * 1.25
+    breakers_comerciales = [15, 20, 30, 40, 50, 60, 70, 80, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 500, 600]
+    
+    breaker_sel = breakers_comerciales[-1]
+    for b in breakers_comerciales:
+        if b >= i_proteccion:
+            breaker_sel = b
+            break
+            
+    polos = "3P" if fases == 3 else ("2P" if fases == 2 else "1P")
+    return f"{breaker_sel}A / {polos}"
 
-def seleccionar_cable(corriente_a: float) -> str:
-    for c in TABLA_AWG:
-        if c["capacidad_a"] >= corriente_a:
-            return c["awg"]
-    return "350 kcmil o superior"
-
-def seleccionar_breaker(corriente_diseno_a: float) -> int:
-    for b in BREAKERS_ESTANDAR:
-        if b >= corriente_diseno_a:
-            return b
-    return BREAKERS_ESTANDAR[-1]
-
-def calcular_caida_tension(corriente_a: float, distancia_m: float, voltaje: float, fases: int) -> float:
-    # Resistencia aproximada del cobre (K = 12.9)
+def calcular_caida_tension_pct(corriente: float, distancia_m: float, voltaje: float, fases: int) -> float:
+    """Calcula el porcentaje de caída de tensión aproximado."""
+    # Factor K aproximado para cobre en tubería conduit (impedancia simplificada)
+    k = 0.000035 
     if fases == 3:
-        delta_v = (math.sqrt(3) * corriente_a * distancia_m * 0.002)
+        delta_v = math.sqrt(3) * corriente * distancia_m * k * 100
     else:
-        delta_v = (2 * corriente_a * distancia_m * 0.002)
-    return round((delta_v / voltaje) * 100, 2)
+        delta_v = 2 * corriente * distancia_m * k * 100
+        
+    caida_pct = (delta_v / voltaje) if voltaje > 0 else 0.0
+    return round(caida_pct, 2)
 
 def generar_cuadro_de_cargas(datos_tablero: dict, lista_equipos: list, pais_norma: str = "COLOMBIA") -> dict:
+    """
+    Procesa la lista de equipos y genera el cuadro de cargas, calculando corrientes,
+    potencia total en kW, alimentadores y requerimientos del transformador.
+    """
     usar_trafo = datos_tablero.get("usar_transformador", False)
     v_primario = datos_tablero.get("voltaje_primario", 220)
     fases_primario = datos_tablero.get("fases_primario", 3)
-    
-    v_secundario = datos_tablero.get("voltaje_secundario", 380) if usar_trafo else datos_tablero.get("voltaje", 220)
-    fases_secundario = datos_tablero.get("fases_secundario", 3)
-    
-    eficiencia_trafo = datos_tablero.get("eficiencia_trafo", 0.95) if usar_trafo else 1.0
+    v_secundario = datos_tablero.get("voltaje_secundario", 380)
+    distancia_acometida = datos_tablero.get("distancia_acometida_m", 15.0)
+    eficiencia_trafo = datos_tablero.get("eficiencia_trafo", 0.95)
 
     cuadro_circuitos = []
     potencia_total_w = 0.0
 
-    # 1. CIRCUITOS DERIVADOS (Alimentados al voltaje secundario / lado máquina)
     for eq in lista_equipos:
-        pot_w = eq["potencia_w"]
-        volt = v_secundario
-        f = eq.get("fases", fases_secundario)
-        fp = eq.get("fp", 0.85)
-        dist = eq.get("distancia_m", 10.0)
+        # CORRECCIÓN DE LA CLAVE: Manejo robusto para potencia_kw o potencia_w
+        if "potencia_kw" in eq:
+            pot_w = float(eq["potencia_kw"]) * 1000.0
+        elif "potencia_w" in eq:
+            pot_w = float(eq["potencia_w"])
+        else:
+            pot_w = 0.0
 
+        pot_kw = round(pot_w / 1000.0, 2)
         potencia_total_w += pot_w
 
-        if f == 3:
-            i_nom = pot_w / (math.sqrt(3) * volt * fp)
-        else:
-            i_nom = pot_w / (volt * fp)
+        voltaje_eq = float(eq.get("voltaje", v_secundario))
+        fases_eq = int(eq.get("fases", 3))
+        fp = float(eq.get("fp", 0.85))
+        dist_m = float(eq.get("distancia_m", 10.0))
 
-        i_diseno = i_nom * 1.25  # Factor continuo 125%
-        cable = seleccionar_cable(i_diseno)
-        brk = seleccionar_breaker(i_diseno)
-        caida = calcular_caida_tension(i_nom, dist, volt, f)
+        # Cálculo de corriente de línea
+        if fases_eq == 3:
+            i_diseno = pot_w / (math.sqrt(3) * voltaje_eq * fp)
+        else:
+            i_diseno = pot_w / (voltaje_eq * fp)
+
+        i_diseno = round(i_diseno, 2)
+        cable_awg = obtener_calibre_awg(i_diseno)
+        breaker_str = obtener_breaker_sugerido(i_diseno, fases_eq)
+        caida_pct = calcular_caida_tension_pct(i_diseno, dist_m, voltaje_eq, fases_eq)
 
         cuadro_circuitos.append({
-            "equipo": eq["nombre"],
-            "potencia_kw": round(pot_w / 1000, 2),
-            "corriente_diseno_a": round(i_diseno, 2),
-            "cable_awg": cable,
-            "caida_pct": caida,
-            "breaker": f"{brk}A / {f}P"
+            "equipo": eq.get("nombre", "Equipo Generico"),
+            "potencia_kw": pot_kw,
+            "potencia_w": pot_w,
+            "corriente_diseno_a": i_diseno,
+            "cable_awg": cable_awg,
+            "caida_pct": caida_pct,
+            "breaker": breaker_str
         })
 
-    # 2. LADO SECUNDARIO DEL TRANSFORMADOR (Salida a Máquina - 380V Trifásico)
-    fp_promedio = 0.90
-    if fases_secundario == 3:
-        i_secundaria_nom = potencia_total_w / (math.sqrt(3) * v_secundario * fp_promedio)
-    else:
-        i_secundaria_nom = potencia_total_w / (v_secundario * fp_promedio)
-    i_secundaria_diseno = i_secundaria_nom * 1.25
+    potencia_total_kw = round(potencia_total_w / 1000.0, 2)
 
-    # 3. LADO PRIMARIO DEL TRANSFORMADOR (Acometida Red Cliente)
-    potencia_primario_w = potencia_total_w / eficiencia_trafo
-
-    if fases_primario == 3:
-        i_primaria_nom = potencia_primario_w / (math.sqrt(3) * v_primario * fp_promedio)
-    else:
-        i_primaria_nom = potencia_primario_w / (v_primario * fp_promedio)
+    # Cálculo de corriente de la acometida principal (lado primario)
+    pot_trafo_w = potencia_total_w / eficiencia_trafo if usar_trafo else potencia_total_w
     
-    i_primaria_diseno = i_primaria_nom * 1.25
+    if fases_primario == 3:
+        i_acometida_primario = pot_trafo_w / (math.sqrt(3) * v_primario * 0.90)
+    elif fases_primario == 2:
+        i_acometida_primario = pot_trafo_w / (v_primario * 0.90)
+    else:
+        i_acometida_primario = pot_trafo_w / (v_primario * 0.90)
 
-    cable_primario = seleccionar_cable(i_primaria_diseno)
-    breaker_primario = seleccionar_breaker(i_primaria_diseno)
-    caida_primaria = calcular_caida_tension(i_primaria_nom, datos_tablero.get("distancia_acometida_m", 15.0), v_primario, fases_primario)
+    i_acometida_primario = round(i_acometida_primario, 2)
+    cable_acometida = obtener_calibre_awg(i_acometida_primario)
+    breaker_primario_amp = int(math.ceil((i_acometida_primario * 1.25) / 5.0) * 5)
+    
+    caida_acometida_pct = calcular_caida_tension_pct(i_acometida_primario, distancia_acometida, v_primario, fases_primario)
 
-    # Margen de seguridad del 20% para el transformador
-    kva_transformador = math.ceil((potencia_primario_w / 1000) * 1.2)
+    # Potencia en kVA para sugerencia de transformador
+    kva_requeridos = (potencia_total_kw / 0.85) / eficiencia_trafo
+    estandares_kva = [5, 10, 15, 20, 25, 30, 45, 75, 112.5, 150]
+    capacidad_trafo_kva = estandares_kva[-1]
+    for kva in estandares_kva:
+        if kva >= kva_requeridos:
+            capacidad_trafo_kva = kva
+            break
 
     return {
         "norma_aplicada": f"RETIE / NTC 2050 ({pais_norma})",
         "usar_transformador": usar_trafo,
-        "cuadro_cargas_circuitos": cuadro_circuitos,
         "transformador": {
-            "capacidad_sugerida_kva": kva_transformador,
+            "capacidad_sugerida_kva": capacidad_trafo_kva,
             "v_primario": v_primario,
             "fases_primario": fases_primario,
             "v_secundario": v_secundario,
-            "fases_secundario": fases_secundario,
             "eficiencia": f"{int(eficiencia_trafo * 100)}%"
         },
         "tablero_principal": {
-            "potencia_total_kw": round(potencia_total_w / 1000, 2),
-            "potencia_primario_kw": round(potencia_primario_w / 1000, 2),
-            "corriente_diseno_a": round(i_primaria_diseno, 2),
-            "corriente_secundaria_a": round(i_secundaria_diseno, 2),
-            "alimentador_awg": cable_primario,
-            "caida_acometida_pct": caida_primaria,
+            "potencia_total_kw": potencia_total_kw,
+            "corriente_diseno_a": i_acometida_primario,
+            "alimentador_awg": cable_acometida,
+            "caida_acometida_pct": caida_acometida_pct,
             "breaker_principal": {
-                "amperios": breaker_primario,
+                "amperios": breaker_primario_amp,
                 "polos": fases_primario,
-                "capacidad_interrupcion_ka": 10 if i_primaria_diseno <= 100 else 18,
-                "curva": "C / D"
+                "capacidad_interrupcion_ka": 10 if v_primario <= 220 else 18,
+                "curva": "C"
             }
-        }
+        },
+        "cuadro_cargas_circuitos": cuadro_circuitos
     }
