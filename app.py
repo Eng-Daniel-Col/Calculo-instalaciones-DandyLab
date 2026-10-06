@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # --- LOGIN ---
-USUARIOS = {"daniel": "dandylab2026*", "tecnico1": "laser2026"}
+USUARIOS = {"Eng.daniel": "dandylab2026*", "Eng.dannier": "test2026", "Eng.sebastian": "laser2026"}
 
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
