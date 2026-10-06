@@ -41,7 +41,7 @@ archivos_encontrados = glob.glob(os.path.join(carpeta_logo, "*.*"))
 col_logo, col_titulo = st.columns([1, 4])
 with col_logo:
     if archivos_encontrados:
-        st.image(archivos_encontrados[0], width=140)
+        st.image(archivos_encontrados[0], width=240)
     else:
         st.warning("⚠️ Sin logo en assets/logo/")
 
