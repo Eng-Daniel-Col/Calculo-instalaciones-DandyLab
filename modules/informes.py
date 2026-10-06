@@ -95,8 +95,8 @@ def generar_pdf_informe(
     archivos_logo = glob.glob(os.path.join(carpeta_logo, "*.*"))
     
     if archivos_logo:
-        img_logo = Image(archivos_logo[0], width=110, height=45)
-        encabezado_data = [[img_logo, Paragraph("<b>DANDYLAB SOLUCIONES</b><br/><font size=8 color='#475569'>Servicios de Ingeniería | Instalaciones Industriales & Láser</font>", titulo_style)]]
+        img_logo = Image(archivos_logo[0], width=200, height=45)
+        encabezado_data = [[img_logo, Paragraph("<b>DANDYLAB SOLUCIONES</b><br/><font size=8 color='#475569'>Servicios de Ingeniería | Instalaciones Industriales, Láser & Robotica</font>", titulo_style)]]
         t_header = Table(encabezado_data, colWidths=[120, 420])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
         story.append(t_header)
@@ -187,7 +187,7 @@ def generar_pdf_informe(
 
     # 7. FIRMA
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#94a3b8"), spaceAfter=10))
-    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Automatización e Instalaciones Industriales", texto_normal))
+    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Fibra laser y Robotica", texto_normal))
     story.append(Paragraph("Dandylab Soluciones | Medellín, Colombia", subtitulo_style))
 
     doc.build(story)
