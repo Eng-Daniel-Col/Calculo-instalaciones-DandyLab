@@ -49,7 +49,7 @@ with col_titulo:
     st.title("⚡ DandyLab Soluciones")
     st.caption("Dimensionamiento Eléctrico Industrial & Especializado bajo RETIE / NTC 2050")
 
-# Inicialización de estado con identificadores únicos (Potencias en kW)
+# Inicialización de estado con identificadores únicos
 if "equipos" not in st.session_state:
     st.session_state.equipos = [
         {"id": str(uuid.uuid4()), "nombre": "Fuente Láser", "potencia_kw": 6.0, "voltaje": 380.0, "fases": 3, "fp": 0.90, "distancia_m": 10.0},
@@ -82,13 +82,16 @@ with tab_calc:
     with col_t5:
         norma_seleccionada = st.selectbox("Norma Aplicable", ["COLOMBIA", "MEXICO", "EEUU"], index=0)
 
-    # Diagrama textual de flujo
+    # Cálculo preliminar de carga total requerida para el flujo
+    carga_total_actual = sum([eq.get('potencia_kw', 0.0) for eq in st.session_state.equipos])
+
+    # Diagrama textual de flujo incluyendo la carga del cliente
     st.subheader("💡 Arquitectura de Conexión Seleccionada")
     str_fases = "Trifásica" if fases_primario == 3 else ("Bifásica" if fases_primario == 2 else "Monofásica")
     if usar_trafo:
-        st.info(f"**RED CLIENTE ({v_primario}V {str_fases})** ──[Breaker {fases_primario}P]──> **TRANSFORMADOR** ──({v_secundario}V 3P)──> **TABLERO MÁQUINA** ──> **DERIVADOS**")
+        st.info(f"**RED CLIENTE ({v_primario}V {str_fases})** ──[Breaker {fases_primario}P]──> **TRANSFORMADOR** ──({v_secundario}V 3P)──> **TABLERO MÁQUINA** ──> **CARGA DE CLIENTE ({carga_total_actual:.1f} kW)**")
     else:
-        st.info(f"**RED CLIENTE ({v_primario}V {str_fases})** ──[Breaker {fases_primario}P]──> **TABLERO MÁQUINA** ──> **DERIVADOS ({v_primario}V)**")
+        st.info(f"**RED CLIENTE ({v_primario}V {str_fases})** ──[Breaker {fases_primario}P]──> **TABLERO MÁQUINA** ──> **CARGA DE CLIENTE ({carga_total_actual:.1f} kW / {v_primario}V)**")
 
     st.header("2. Circuitos Derivados (Equipos de la Máquina)")
     col_eq1, col_eq2, col_eq3, col_eq4, col_eq5 = st.columns([2, 1.5, 1.2, 1.2, 1])
@@ -188,7 +191,7 @@ if st.button("🚀 Calcular Dimensionamiento y Generar Informe PDF", type="prima
 
         col_r1, col_r2, col_r3, col_r4 = st.columns(4)
         tab_info = resultado["tablero_principal"]
-        col_r1.metric("Potencia Entrada", f"{tab_info['potencia_primario_kw']} kW")
+        col_r1.metric("Potencia Requerida (Carga)", f"{tab_info['potencia_total_kw']} kW")
         col_r2.metric("Corriente Entrada (Primario)", f"{tab_info['corriente_diseno_a']} A")
         col_r3.metric("Alimentador Principal", f"{tab_info['alimentador_awg']}")
         col_r4.metric("Breaker Acometida", f"{tab_info['breaker_principal']['amperios']} A ({fases_primario}P)")
