@@ -49,11 +49,11 @@ with col_titulo:
     st.title("⚡ DandyLab Soluciones")
     st.caption("Dimensionamiento Eléctrico Industrial & Especializado bajo RETIE / NTC 2050")
 
-# Inicialización de estado con identificadores únicos
+# Inicialización de estado con identificadores únicos (Potencias en kW)
 if "equipos" not in st.session_state:
     st.session_state.equipos = [
-        {"id": str(uuid.uuid4()), "nombre": "Fuente Láser", "potencia_w": 6000.0, "voltaje": 380.0, "fases": 3, "fp": 0.90, "distancia_m": 10.0},
-        {"id": str(uuid.uuid4()), "nombre": "Chiller de Enfriamiento", "potencia_w": 3000.0, "voltaje": 380.0, "fases": 3, "fp": 0.85, "distancia_m": 15.0}
+        {"id": str(uuid.uuid4()), "nombre": "Fuente Láser", "potencia_kw": 6.0, "voltaje": 380.0, "fases": 3, "fp": 0.90, "distancia_m": 10.0},
+        {"id": str(uuid.uuid4()), "nombre": "Chiller de Enfriamiento", "potencia_kw": 3.0, "voltaje": 380.0, "fases": 3, "fp": 0.85, "distancia_m": 15.0}
     ]
 
 tab_calc, tab_cliente, tab_fotos = st.tabs([
@@ -96,7 +96,7 @@ with tab_calc:
     with col_eq1:
         nuevo_nombre = st.text_input("Nombre del Equipo", value="Extractor de Humos")
     with col_eq2:
-        nueva_potencia = st.number_input("Potencia (Watts)", min_value=100.0, value=1500.0, step=100.0)
+        nueva_potencia_kw = st.number_input("Potencia (kW)", min_value=0.1, value=1.5, step=0.5)
     with col_eq3:
         nuevas_fases = st.selectbox("Fases", [3, 1], index=0, key="nuevo_f")
     with col_eq4:
@@ -107,7 +107,7 @@ with tab_calc:
             st.session_state.equipos.append({
                 "id": str(uuid.uuid4()),
                 "nombre": nuevo_nombre,
-                "potencia_w": nueva_potencia,
+                "potencia_kw": nueva_potencia_kw,
                 "voltaje": v_secundario,
                 "fases": nuevas_fases,
                 "fp": 0.85,
@@ -120,7 +120,7 @@ with tab_calc:
         for eq in list(st.session_state.equipos):
             c1, c2, c3, c4, c5 = st.columns([3, 2, 2, 2, 1])
             c1.write(f"**{eq['nombre']}**")
-            c2.write(f"⚡ {eq['potencia_w']} W")
+            c2.write(f"⚡ {eq.get('potencia_kw', 0.0)} kW")
             c3.write(f"🌀 {'Trifásico' if eq['fases'] == 3 else 'Monofásico'}")
             c4.write(f"📏 {eq['distancia_m']} m")
             if c5.button("🗑️", key=f"del_{eq['id']}"):
