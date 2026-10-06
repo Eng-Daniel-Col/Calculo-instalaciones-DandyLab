@@ -95,9 +95,9 @@ def generar_pdf_informe(
     archivos_logo = glob.glob(os.path.join(carpeta_logo, "*.*"))
     
     if archivos_logo:
-        img_logo = Image(archivos_logo[0], width=200, height=45)
+        img_logo = Image(archivos_logo[0], width=150, height=45)
         encabezado_data = [[img_logo, Paragraph("<b>DANDYLAB SOLUCIONES</b><br/><font size=8 color='#475569'>Servicios de Ingeniería | Instalaciones Industriales, Láser & Robotica</font>", titulo_style)]]
-        t_header = Table(encabezado_data, colWidths=[120, 420])
+        t_header = Table(encabezado_data, colWidths=[160, 420])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
         story.append(t_header)
     else:
