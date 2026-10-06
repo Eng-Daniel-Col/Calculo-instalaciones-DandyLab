@@ -133,7 +133,9 @@ def generar_pdf_informe(
     story.append(Paragraph("CIRCUITOS DERIVADOS (LADO MÁQUINA / SECUNDARIO)", header_seccion))
     tabla_datos = [["Equipo", "Pot (kW)", "I. Dis (A)", "Cable AWG", "ΔV (%)", "Protección Breaker"]]
     for c in resultado_calculo["cuadro_cargas_circuitos"]:
-        tabla_datos.append([c["equipo"], f"{c['potencia_kw']} kW", f"{c['corriente_diseno_a']} A", c["cable_awg"], f"{c['caida_pct']}%", c["breaker"]])
+        # Se soporta la clave 'potencia_kw'
+        pot_val = c.get("potencia_kw", c.get("potencia_w", 0))
+        tabla_datos.append([c["equipo"], f"{pot_val} kW", f"{c['corriente_diseno_a']} A", c["cable_awg"], f"{c['caida_pct']}%", c["breaker"]])
 
     t_cuadro = Table(tabla_datos, colWidths=[110, 55, 65, 75, 55, 180])
     t_cuadro.setStyle(TableStyle([
@@ -171,7 +173,7 @@ def generar_pdf_informe(
 
     # 7. FIRMA
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#94a3b8"), spaceAfter=10))
-    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Automatización e Instalaciones Industriales", texto_normal))
+    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Fibra laser y Robotica Industrial", texto_normal))
     story.append(Paragraph("Dandylab Soluciones | Medellín, Colombia", subtitulo_style))
 
     doc.build(story)
