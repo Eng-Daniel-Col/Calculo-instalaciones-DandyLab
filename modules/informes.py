@@ -8,46 +8,61 @@ from reportlab.lib import colors
 from reportlab.graphics.shapes import Drawing, Rect, String, Line
 
 def crear_diagrama_unifilar(resultado_calculo: dict) -> Drawing:
-    """Genera un esquema unifilar gráfico vectorial para el PDF."""
-    d = Drawing(500, 140)
+    """Genera un esquema unifilar gráfico vectorial con el flujo completo de energía hasta la Carga del Cliente."""
+    d = Drawing(520, 140)
     usar_trafo = resultado_calculo.get("usar_transformador", False)
     tab = resultado_calculo["tablero_principal"]
     trafo = resultado_calculo["transformador"]
     
     c_box = colors.HexColor("#1e293b")
     c_trafo = colors.HexColor("#2563eb")
+    c_carga = colors.HexColor("#0f766e")
     c_txt = colors.white
 
     texto_fases_primario = "Trifásica" if trafo['fases_primario'] == 3 else ("Bifásica" if trafo['fases_primario'] == 2 else "Monofásica")
 
-    # Nodo 1: Red Cliente
-    d.add(Rect(10, 40, 120, 65, rx=4, ry=4, fillColor=c_box, strokeColor=None))
-    d.add(String(18, 88, "RED CLIENTE", fillColor=c_txt, fontSize=9, fontName="Helvetica-Bold"))
-    d.add(String(18, 73, f"{trafo['v_primario']}V ({texto_fases_primario})", fillColor=c_txt, fontSize=8))
-    d.add(String(18, 58, f"Breaker: {tab['breaker_principal']['amperios']}A / {trafo['fases_primario']}P", fillColor=colors.HexColor("#93c5fd"), fontSize=8))
+    # 1. Nodo: Red Cliente (Acometida)
+    d.add(Rect(10, 35, 110, 75, rx=4, ry=4, fillColor=c_box, strokeColor=None))
+    d.add(String(18, 93, "RED CLIENTE", fillColor=c_txt, fontSize=8, fontName="Helvetica-Bold"))
+    d.add(String(18, 78, f"Voltaje: {trafo['v_primario']}V", fillColor=c_txt, fontSize=7))
+    d.add(String(18, 65, f"Tipo: {texto_fases_primario}", fillColor=c_txt, fontSize=7))
+    d.add(String(18, 50, f"Breaker: {tab['breaker_principal']['amperios']}A/{trafo['fases_primario']}P", fillColor=colors.HexColor("#93c5fd"), fontSize=7))
 
     # Línea 1
-    d.add(Line(130, 72, 175, 72, strokeColor=colors.HexColor("#64748b"), strokeWidth=2))
+    d.add(Line(120, 72, 145, 72, strokeColor=colors.HexColor("#64748b"), strokeWidth=2))
 
     if usar_trafo:
-        # Nodo 2: Transformador
-        d.add(Rect(175, 35, 140, 75, rx=4, ry=4, fillColor=c_trafo, strokeColor=None))
-        d.add(String(185, 93, "TRANSFORMADOR", fillColor=c_txt, fontSize=9, fontName="Helvetica-Bold"))
-        d.add(String(185, 78, f"Capacidad: {trafo['capacidad_sugerida_kva']} kVA", fillColor=c_txt, fontSize=8))
-        d.add(String(185, 63, f"Entrada: {trafo['v_primario']}V ({trafo['fases_primario']}P)", fillColor=c_txt, fontSize=8))
-        d.add(String(185, 48, f"Salida: {trafo['v_secundario']}V (3P)", fillColor=colors.HexColor("#bfdbfe"), fontSize=8))
+        # 2. Nodo: Transformador
+        d.add(Rect(145, 35, 115, 75, rx=4, ry=4, fillColor=c_trafo, strokeColor=None))
+        d.add(String(152, 93, "TRANSFORMADOR", fillColor=c_txt, fontSize=8, fontName="Helvetica-Bold"))
+        d.add(String(152, 78, f"Cap: {trafo['capacidad_sugerida_kva']} kVA", fillColor=c_txt, fontSize=7))
+        d.add(String(152, 65, f"Ent: {trafo['v_primario']}V ({trafo['fases_primario']}P)", fillColor=c_txt, fontSize=7))
+        d.add(String(152, 50, f"Sal: {trafo['v_secundario']}V (3P)", fillColor=colors.HexColor("#bfdbfe"), fontSize=7))
 
         # Línea 2
-        d.add(Line(315, 72, 360, 72, strokeColor=colors.HexColor("#64748b"), strokeWidth=2))
-        x_final = 360
+        d.add(Line(260, 72, 285, 72, strokeColor=colors.HexColor("#64748b"), strokeWidth=2))
+        x_tablero = 285
     else:
-        x_final = 175
+        x_tablero = 145
 
-    # Nodo 3: Tablero Máquina
-    d.add(Rect(x_final, 40, 130, 65, rx=4, ry=4, fillColor=c_box, strokeColor=None))
-    d.add(String(x_final + 10, 88, "TABLERO MÁQUINA", fillColor=c_txt, fontSize=9, fontName="Helvetica-Bold"))
-    d.add(String(x_final + 10, 73, f"Operación: {trafo['v_secundario']}V Trifásico", fillColor=c_txt, fontSize=8))
-    d.add(String(x_final + 10, 58, f"Potencia Total: {tab['potencia_total_kw']} kW", fillColor=colors.HexColor("#86efac"), fontSize=8))
+    # 3. Nodo: Tablero Máquina / Distribución
+    d.add(Rect(x_tablero, 35, 110, 75, rx=4, ry=4, fillColor=c_box, strokeColor=None))
+    d.add(String(x_tablero + 8, 93, "TABLERO MÁQUINA", fillColor=c_txt, fontSize=8, fontName="Helvetica-Bold"))
+    d.add(String(x_tablero + 8, 78, f"Operación: {trafo['v_secundario']}V", fillColor=c_txt, fontSize=7))
+    d.add(String(x_tablero + 8, 65, "Sistema: Trifásico", fillColor=c_txt, fontSize=7))
+    d.add(String(x_tablero + 8, 50, f"Cable: {tab['alimentador_awg']}", fillColor=colors.HexColor("#93c5fd"), fontSize=7))
+
+    # Línea 3 -> Carga
+    x_carga_linea = x_tablero + 110
+    x_nodo_carga = x_carga_linea + 25
+    d.add(Line(x_carga_linea, 72, x_nodo_carga, 72, strokeColor=colors.HexColor("#64748b"), strokeWidth=2))
+
+    # 4. Nodo: Carga / Consumo Máquina
+    d.add(Rect(x_nodo_carga, 35, 110, 75, rx=4, ry=4, fillColor=c_carga, strokeColor=None))
+    d.add(String(x_nodo_carga + 8, 93, "CARGA REQUERIDA", fillColor=c_txt, fontSize=8, fontName="Helvetica-Bold"))
+    d.add(String(x_nodo_carga + 8, 78, f"Pot. Total: {tab['potencia_total_kw']} kW", fillColor=colors.HexColor("#5eead4"), fontSize=7, fontName="Helvetica-Bold"))
+    d.add(String(x_nodo_carga + 8, 65, f"I. Diseño: {tab['corriente_diseno_a']} A", fillColor=c_txt, fontSize=7))
+    d.add(String(x_nodo_carga + 8, 50, f"Circuitos: {len(resultado_calculo['cuadro_cargas_circuitos'])} Equipos", fillColor=c_txt, fontSize=7))
 
     return d
 
@@ -118,7 +133,7 @@ def generar_pdf_informe(
 
     info_principal = [
         ["Red del Cliente (Primario):", f"{trafo['v_primario']} V AC | Tipo: {texto_fases}"],
-        ["Salida Máquina (Secundario):", f"{trafo['v_secundario']} V AC | Tipo: Trifásica (3P)"],
+        ["Carga Requerida por la Máquina:", f"{tab['potencia_total_kw']} kW | Lado Secundario ({trafo['v_secundario']}V Trifásico)"],
         ["Transformador Recomendado:", f"{trafo['capacidad_sugerida_kva']} kVA (Eficiencia {trafo['eficiencia']})" if resultado_calculo['usar_transformador'] else "No requiere transformador"],
         ["Corriente Diseñada (Primario):", f"{tab['corriente_diseno_a']} A"],
         ["Cable Alimentador Primario:", f"{tab['alimentador_awg']} (Caída ΔV: {tab['caida_acometida_pct']}%)"],
@@ -133,7 +148,6 @@ def generar_pdf_informe(
     story.append(Paragraph("CIRCUITOS DERIVADOS (LADO MÁQUINA / SECUNDARIO)", header_seccion))
     tabla_datos = [["Equipo", "Pot (kW)", "I. Dis (A)", "Cable AWG", "ΔV (%)", "Protección Breaker"]]
     for c in resultado_calculo["cuadro_cargas_circuitos"]:
-        # Se soporta la clave 'potencia_kw'
         pot_val = c.get("potencia_kw", c.get("potencia_w", 0))
         tabla_datos.append([c["equipo"], f"{pot_val} kW", f"{c['corriente_diseno_a']} A", c["cable_awg"], f"{c['caida_pct']}%", c["breaker"]])
 
@@ -173,7 +187,7 @@ def generar_pdf_informe(
 
     # 7. FIRMA
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#94a3b8"), spaceAfter=10))
-    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Fibra laser y Robotica Industrial", texto_normal))
+    story.append(Paragraph("<b>Ing. Daniel Araujo</b> — Especialista en Automatización e Instalaciones Industriales", texto_normal))
     story.append(Paragraph("Dandylab Soluciones | Medellín, Colombia", subtitulo_style))
 
     doc.build(story)
