@@ -43,13 +43,13 @@ with col_logo:
     if archivos_encontrados:
         st.image(archivos_encontrados[0], width=240)
     else:
-        st.warning("⚠️ Sin logo en assets/logo/")
+        st.warning("⚠️️ Sin logo en assets/logo/")
 
 with col_titulo:
     st.title("⚡ DandyLab Soluciones")
     st.caption("Dimensionamiento Eléctrico Industrial & Especializado bajo RETIE / NTC 2050")
 
-# Inicialización de estado con identificadores únicos
+# Inicialización de estado con identificadores únicos y claves estandarizadas
 if "equipos" not in st.session_state:
     st.session_state.equipos = [
         {"id": str(uuid.uuid4()), "nombre": "Fuente Láser", "potencia_kw": 6.0, "voltaje": 380.0, "fases": 3, "fp": 0.90, "distancia_m": 10.0},
@@ -82,7 +82,7 @@ with tab_calc:
     with col_t5:
         norma_seleccionada = st.selectbox("Norma Aplicable", ["COLOMBIA", "MEXICO", "EEUU"], index=0)
 
-    # Cálculo preliminar de carga total requerida para el flujo
+    # Cálculo preliminar de carga total requerida para la visualización del flujo
     carga_total_actual = sum([eq.get('potencia_kw', 0.0) for eq in st.session_state.equipos])
 
     # Diagrama textual de flujo incluyendo la carga del cliente
@@ -160,7 +160,7 @@ with tab_fotos:
                 st.image(file, caption=file.name, use_column_width=True)
 
 # ---------------------------------------------------------
-# CÁLCULO GENERAL Y GENERACIÓN
+# CÁLCULO GENERAL Y GENERACIÓN DE INFORME
 # ---------------------------------------------------------
 st.divider()
 
